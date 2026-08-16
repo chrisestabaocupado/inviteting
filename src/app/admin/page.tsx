@@ -33,7 +33,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { PinGate } from "@/components/pin-gate";
@@ -124,7 +123,15 @@ export default function AdminPage() {
   const [checking, setChecking] = useState(true);
   const [tab, setTab] = useState<Tab>("solicitudes");
 
-  const [evento, setEvento] = useState<Evento | null>(null);
+  const [evento, setEvento] = useState<Evento | null>({
+    id: "",
+    nombre: "",
+    fecha: "",
+    hora: "",
+    lugar: "",
+    descripcion: "",
+    inscripciones_abiertas: false,
+  });
   const [entes, setEntes] = useState<Ente[]>([]);
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [filter, setFilter] = useState<"todas" | Solicitud["estado_solicitud"]>("todas");
@@ -149,7 +156,7 @@ export default function AdminPage() {
   // Load data when authed or tab changes
   useEffect(() => {
     if (!authed) return;
-    if (tab === "evento") loadEvento();
+    loadEvento();
     if (tab === "entes") loadEntes();
     if (tab === "solicitudes" || tab === "invitados") loadSolicitudes();
   }, [authed, tab]);
@@ -542,11 +549,13 @@ export default function AdminPage() {
       {/* FAB */}
       {tab === "entes" && (
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger>
-            <button className="fixed bottom-[calc(64px+16px)] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#4338ca] text-white shadow-[0_6px_18px_rgba(67,56,202,0.35)] active:scale-95">
-              <Plus size={26} />
-            </button>
-          </DialogTrigger>
+          <button
+            aria-label="Nuevo ente"
+            onClick={() => setDialogOpen(true)}
+            className="fixed bottom-[calc(64px+16px)] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#4338ca] text-white shadow-[0_6px_18px_rgba(67,56,202,0.35)] active:scale-95"
+          >
+            <Plus size={26} />
+          </button>
           <DialogContent className="rounded-[14px] border-[#e5e5e8]">
             <DialogHeader>
               <DialogTitle className="text-base font-bold">Nuevo ente</DialogTitle>

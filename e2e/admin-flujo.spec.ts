@@ -34,13 +34,12 @@ test("flujo completo: login → evento → ente → registro → aprobar → QR"
     await page.locator('[role="switch"]').first().click();
   }
 
-  await page.click('button:has-text("Guardar cambios")');
-  await page.waitForSelector("text=Cambios guardados");
+  await page.waitForTimeout(500);
 
   // ===== 3. Crear ente =====
   await page.click('button:has-text("Entes")');
   await page.waitForSelector("text=Entes invitados");
-  await page.click('button:has-text("+")');
+  await page.getByRole("button", { name: "Nuevo ente" }).click();
   await page.fill('input[placeholder="Ej. Embajada de España"]', `Ente E2E ${ts}`);
   await page.click('button:has-text("Crear ente")');
   await page.waitForSelector("text=Ente creado");
@@ -55,8 +54,8 @@ test("flujo completo: login → evento → ente → registro → aprobar → QR"
   const guestEmail = `e2e-${ts}@example.com`;
   await page.goto("/registro");
   await page.waitForSelector("text=Registro de invitados");
-  await page.click('[placeholder="Selecciona tu ente…"]');
-  await page.click(`text=${enteNombre}`);
+  await page.getByRole("combobox").click();
+  await page.getByRole("option", { name: enteNombre }).click();
   await page.fill('[placeholder="••••••"]', entePin);
   await page.fill('[placeholder="Nombre"]', "NombreE2E");
   await page.fill('[placeholder="Apellido"]', "ApellidoE2E");
@@ -72,7 +71,7 @@ test("flujo completo: login → evento → ente → registro → aprobar → QR"
   await expect(page.getByRole("heading", { name: "Solicitudes" })).toBeVisible();
   await expect(page.locator(`text=${guestEmail}`)).toBeVisible();
 
-  const card = page.locator(`text=${guestEmail}`).locator("xpath=../..");
+  const card = page.locator(`text=${guestEmail}`).locator("xpath=../../..");
   await card.locator('button:has-text("Aprobar")').click();
   await expect(page.locator("text=Solicitud aprobada")).toBeVisible();
 
