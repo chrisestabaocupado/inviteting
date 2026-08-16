@@ -37,6 +37,9 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { PinGate } from "@/components/pin-gate";
+import { InvitacionPdfDocument } from "@/components/invitacion-pdf";
+import { pdf } from "@react-pdf/renderer";
+import QRCode from "qrcode";
 
 /* ---------- Types ---------- */
 interface Evento {
@@ -295,17 +298,44 @@ export default function AdminPage() {
   async function downloadInvitacion(id: string) {
     const res = await fetch(`/api/admin/invitacion/${id}`);
     const d = await res.json();
-    if (d.ok) {
-      toast.success("Invitación descargada");
-      // Trigger PDF download if available, otherwise just confirm
-    } else {
+    if (!d.ok) {
       toast.error(d.error || "Error");
+      return;
     }
+    const { invitado, ente, evento } = d.data;
+    if (!invitado?.token_qr || !evento) {
+      toast.error("Faltan datos para generar PDF");
+      return;
+    }
+    const qrDataUrl = await QRCode.toDataURL(invitado.token_qr, { width: 400, margin: 2 });
+    const blob = await pdf(
+      <InvitacionPdfDocument
+        evento={evento}
+        invitado={invitado}
+        enteNombre={ente?.nombre ?? "—"}
+        qrDataUrl={qrDataUrl}
+      />
+    ).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `invitacion-${invitado.nombre}-${invitado.apellido}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    toast.success("Invitación descargada");
   }
 
   async function markSent(id: string) {
-    // PATCH invitado estado_invitacion=enviada (not a real endpoint; simulate with note)
-    toast.success("Marcada como enviada");
+    const res = await fetch(`/api/admin/solicitudes/${id}/marcar-enviada`, { method: "POST" });
+    const d = await res.json();
+    if (d.ok) {
+      toast.success("Marcada como enviada");
+      loadSolicitudes();
+    } else {
+      toast.error(d.error || "Error");
+    }
   }
 
   async function logout() {

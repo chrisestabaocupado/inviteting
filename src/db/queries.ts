@@ -185,6 +185,19 @@ export async function updateInvitadoEstado(
   return rows[0] ?? null;
 }
 
+export async function markInvitacionEnviada(id: string) {
+  const rows = await db
+    .update(schema.invitado)
+    .set({
+      estado_invitacion: "enviada",
+      enviado_en: new Date(),
+      actualizado_en: new Date(),
+    })
+    .where(eq(schema.invitado.id, id))
+    .returning();
+  return rows[0] ?? null;
+}
+
 export async function getEntradaByInvitado(invitadoId: string) {
   const rows = await db
     .select()

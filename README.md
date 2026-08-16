@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# inviteting
 
-## Getting Started
+Sistema de gestión de invitaciones para eventos protocolares. Construido con Next.js 16 (App Router), TypeScript, Tailwind CSS, shadcn/ui, Drizzle ORM y PostgreSQL (Neon).
 
-First, run the development server:
+## Características
+
+- **Registro público**: invitados se registran con PIN de ente (6 dígitos).
+- **Panel administrativo**: protegido con PIN general; gestiona evento, entes, solicitudes e invitados.
+- **Código QR por invitado**: generado al aprobar; escaneable en entrada.
+- **PDF de invitación**: generado en el navegador con `@react-pdf/renderer` + QR embebido.
+- **Scanner**: validación de QR con `html5-qrcode`.
+
+## Requisitos
+
+- Node.js 22+
+- pnpm
+- Cuenta en [Neon](https://neon.tech) (PostgreSQL serverless)
+
+## Variables de entorno
+
+Copia `.env.example` a `.env` y rellena:
+
+| Variable | Descripción |
+|----------|-------------|
+| `DATABASE_URL` | URL de conexión de Neon (`postgresql://...`) |
+| `GENERAL_ACCESS_PIN` | PIN numérico de 4-20 dígitos para acceso administrativo |
+| `SESSION_SECRET` | Secreto JWT para cookies de sesión (mínimo 32 caracteres) |
+
+## Configurar base de datos (Neon)
+
+1. Crea un proyecto en Neon y copia la **Connection string** (psql).
+2. Establece `DATABASE_URL` en `.env`.
+3. Ejecuta migraciones:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm exec drizzle-kit migrate
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+4. Crea el evento inicial desde el panel administrativo (`/admin`), pestaña **Evento**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm dev          # Servidor de desarrollo (puerto 3000)
+pnpm build        # Build de producción
+pnpm start        # Servidor de producción
+pnpm test         # Tests unitarios con Vitest
+pnpm exec playwright test  # Tests E2E con Playwright
+```
 
-## Learn More
+## Desplegar en Vercel
 
-To learn more about Next.js, take a look at the following resources:
+1. Importa el repositorio en [Vercel](https://vercel.com/new).
+2. En **Environment Variables**, añade las 3 variables del `.env`.
+3. Build command: `pnpm build` (Vercel lo detecta automáticamente).
+4. Framework preset: **Next.js**.
+5. Despliega.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+> Nota: para serverless, usa la **Connection string** de Neon con SSL activado (incluido por defecto en las URLs de Neon).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Tests
 
-## Deploy on Vercel
+- **Unitarios**: Vitest (`src/**/*.test.ts`).
+- **E2E**: Playwright (`e2e/`). El `playwright.config.ts` levanta automáticamente `pnpm start` en un puerto libre.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+> Los tests E2E usan la base de datos real. Ejecútalos solo en entorno de desarrollo.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Estructura clave
+
+```
+src/
+  app/
+    admin/page.tsx          # Panel administrativo
+    registro/page.tsx       # Formulario público
+    scanner/page.tsx        # Lector QR
+    api/                    # Route handlers
+  db/
+    schema.ts               # Esquema Drizzle
+    queries.ts              # Capa de datos
+  components/
+    pin-gate.tsx            # Login por PIN
+    invitacion-pdf.tsx      # Documento PDF con QR
+```
+
+## Licencia
+
+MIT
