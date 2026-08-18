@@ -42,7 +42,7 @@ export function PinGate({ onAuth }: PinGateProps) {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center px-5">
+    <div className="flex min-h-dvh w-full flex-col items-center justify-center px-5 py-8">
       <div className="w-full max-w-[360px] text-center">
         <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-[15px] bg-[#4338ca] text-white shadow-[0_8px_20px_rgba(67,56,202,0.28)]">
           <Ticket size={26} />
@@ -62,7 +62,7 @@ export function PinGate({ onAuth }: PinGateProps) {
             placeholder="••••••"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
-            className="h-12 rounded-[10px] border-[#e5e5e8] bg-white pl-10 text-[15px] shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)]"
+            className="h-12 rounded-[10px] border-[#e5e5e8] bg-white pl-10 text-base shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)] md:text-[15px]"
           />
         </div>
         {error && (

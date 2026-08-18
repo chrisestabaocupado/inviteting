@@ -95,7 +95,7 @@ export default function RegistroPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-[480px] flex-col bg-[#f5f5f6]">
+    <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col bg-[#f5f5f6]">
       <div className="px-6 pt-11 pb-5 text-center">
         <div className="mx-auto mb-4 flex h-[54px] w-[54px] items-center justify-center rounded-[15px] bg-[#4338ca] text-white shadow-[0_8px_20px_rgba(67,56,202,0.28)]">
           <Ticket size={26} />
@@ -109,7 +109,7 @@ export default function RegistroPage() {
         </div>
       </div>
 
-      <div className="mx-4 mb-7 rounded-[14px] border border-[#e5e5e8] bg-white p-[22px_20px] shadow-[0_1px_3px_rgba(0,0,0,0.05)]">
+      <div className="mx-3 mb-7 rounded-[14px] border border-[#e5e5e8] bg-white p-[18px_16px] shadow-[0_1px_3px_rgba(0,0,0,0.05)] sm:mx-6 sm:p-[22px_20px]">
         <form onSubmit={handleSubmit(onSubmit)} noValidate>
           <div className="mb-[15px] flex flex-col gap-[6px]">
             <Label className="text-[13.5px] font-semibold">
@@ -119,13 +119,13 @@ export default function RegistroPage() {
               disabled={loadingEntes}
               onValueChange={(v) => setValue("ente_id", v as string, { shouldValidate: true })}
             >
-              <SelectTrigger className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px]">
+              <SelectTrigger className="h-12 w-full rounded-[10px] border-[#e5e5e8] text-base md:text-[15px]">
                 <SelectValue placeholder="Selecciona tu ente…" />
               </SelectTrigger>
               <SelectContent>
                 {entes.map((e) => (
                   <SelectItem key={e.id} value={e.id}>
-                    <span className="flex items-center gap-2">
+                    <span className="flex min-w-0 items-center gap-2 break-words">
                       <Landmark size={14} /> {e.nombre}
                     </span>
                   </SelectItem>
@@ -151,7 +151,7 @@ export default function RegistroPage() {
                 inputMode="numeric"
                 maxLength={6}
                 placeholder="••••••"
-                className="h-12 rounded-[10px] border-[#e5e5e8] pl-[42px] text-[15px] shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)]"
+                className="h-12 rounded-[10px] border-[#e5e5e8] pl-[42px] text-base shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)] md:text-[15px]"
               />
             </div>
             <div className="flex items-center gap-[5px] text-xs text-[#a1a1aa]">
@@ -162,7 +162,7 @@ export default function RegistroPage() {
             )}
           </div>
 
-          <div className="mb-[15px] grid grid-cols-2 gap-3">
+          <div className="mb-[15px] grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-[6px]">
               <Label className="text-[13.5px] font-semibold">
                 Nombre <span className="text-[#dc2626]">*</span>
@@ -170,7 +170,7 @@ export default function RegistroPage() {
               <Input
                 {...register("nombre")}
                 placeholder="Nombre"
-                className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px] shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)]"
+                className="h-12 rounded-[10px] border-[#e5e5e8] text-base shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)] md:text-[15px]"
               />
               {errors.nombre && (
                 <p className="text-xs font-semibold text-[#dc2626]">{errors.nombre.message}</p>
@@ -183,7 +183,7 @@ export default function RegistroPage() {
               <Input
                 {...register("apellido")}
                 placeholder="Apellido"
-                className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px] shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)]"
+                className="h-12 rounded-[10px] border-[#e5e5e8] text-base shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)] md:text-[15px]"
               />
               {errors.apellido && (
                 <p className="text-xs font-semibold text-[#dc2626]">{errors.apellido.message}</p>
@@ -198,7 +198,7 @@ export default function RegistroPage() {
             <Input
               {...register("cargo")}
               placeholder="Ej. Directora de Protocolo"
-              className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px] shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)]"
+              className="h-12 rounded-[10px] border-[#e5e5e8] text-base shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)] md:text-[15px]"
             />
             {errors.cargo && (
               <p className="text-xs font-semibold text-[#dc2626]">{errors.cargo.message}</p>
@@ -217,7 +217,7 @@ export default function RegistroPage() {
                 {...register("email")}
                 type="email"
                 placeholder="nombre@correo.com"
-                className="h-12 rounded-[10px] border-[#e5e5e8] pl-[42px] text-[15px] shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)]"
+                className="h-12 rounded-[10px] border-[#e5e5e8] pl-[42px] text-base shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)] md:text-[15px]"
               />
             </div>
             {errors.email && (
@@ -237,7 +237,7 @@ export default function RegistroPage() {
                 {...register("telefono")}
                 type="tel"
                 placeholder="+58 412 000 0000"
-                className="h-12 rounded-[10px] border-[#e5e5e8] pl-[42px] text-[15px] shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)]"
+                className="h-12 rounded-[10px] border-[#e5e5e8] pl-[42px] text-base shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)] md:text-[15px]"
               />
             </div>
             {errors.telefono && (
@@ -282,7 +282,7 @@ export default function RegistroPage() {
         </form>
       </div>
 
-      <div className="mt-auto flex items-center justify-center gap-[6px] px-6 pb-9 text-center text-xs text-[#71717a]">
+      <div className="mt-auto flex items-center justify-center gap-[6px] px-6 pb-[calc(2.25rem+env(safe-area-inset-bottom))] text-center text-xs text-[#71717a]">
         <Ticket size={14} /> Recibirás tu invitación con código QR al ser aprobada.
       </div>
     </div>

@@ -368,7 +368,7 @@ export default function AdminPage() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
+      <div className="flex min-h-dvh items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-[#4338ca]" />
       </div>
     );
@@ -379,17 +379,17 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-[480px] bg-[#f5f5f6] pb-[84px]">
+    <div className="mx-auto min-h-dvh w-full max-w-4xl bg-[#f5f5f6] pb-[calc(5.25rem+env(safe-area-inset-bottom))]">
       {/* App bar */}
       <div className="sticky top-0 z-30 border-b border-[#e5e5e8] bg-white px-4 py-[12px_10px]">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-[10px]">
+          <div className="flex min-w-0 items-center gap-[10px]">
             <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#4338ca] text-white">
               <Ticket size={20} />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="text-base font-bold tracking-tight">inviteting</div>
-              <div className="text-xs text-[#71717a]">{evento?.nombre ?? "—"}</div>
+              <div className="truncate text-xs text-[#71717a]">{evento?.nombre ?? "—"}</div>
             </div>
           </div>
           <Switch
@@ -407,10 +407,10 @@ export default function AdminPage() {
       </div>
 
       {/* Content */}
-      <div className="px-4 pt-[14px]">
+      <div className="px-4 pt-[14px] sm:px-6">
         {/* ====== EVENTO ====== */}
         {tab === "evento" && (
-          <div>
+          <div className="mx-auto max-w-2xl">
             <h2 className="mt-[6px] text-[19px] font-bold tracking-tight">Datos del evento</h2>
             <p className="mb-[14px] text-[13px] text-[#71717a]">El único evento de esta instancia.</p>
             <div className="mb-3 rounded-[14px] border border-[#e5e5e8] bg-white p-[14px]">
@@ -419,17 +419,17 @@ export default function AdminPage() {
                 <Input
                   value={evento?.nombre ?? ""}
                   onChange={(e) => setEvento((p) => (p ? { ...p, nombre: e.target.value } : p))}
-                  className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px] shadow-none"
+                  className="h-12 rounded-[10px] border-[#e5e5e8] text-base shadow-none md:text-[15px]"
                 />
               </div>
-              <div className="mb-[13px] grid grid-cols-2 gap-3">
+              <div className="mb-[13px] grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-[6px]">
                   <Label className="text-[13px] font-semibold">Fecha</Label>
                   <Input
                     type="date"
                     value={evento?.fecha ?? ""}
                     onChange={(e) => setEvento((p) => (p ? { ...p, fecha: e.target.value } : p))}
-                    className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px] shadow-none"
+                    className="h-12 rounded-[10px] border-[#e5e5e8] text-base shadow-none md:text-[15px]"
                   />
                 </div>
                 <div className="flex flex-col gap-[6px]">
@@ -438,7 +438,7 @@ export default function AdminPage() {
                     type="time"
                     value={evento?.hora ?? ""}
                     onChange={(e) => setEvento((p) => (p ? { ...p, hora: e.target.value } : p))}
-                    className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px] shadow-none"
+                    className="h-12 rounded-[10px] border-[#e5e5e8] text-base shadow-none md:text-[15px]"
                   />
                 </div>
               </div>
@@ -447,7 +447,7 @@ export default function AdminPage() {
                 <Input
                   value={evento?.lugar ?? ""}
                   onChange={(e) => setEvento((p) => (p ? { ...p, lugar: e.target.value } : p))}
-                  className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px] shadow-none"
+                  className="h-12 rounded-[10px] border-[#e5e5e8] text-base shadow-none md:text-[15px]"
                 />
               </div>
               <div className="mb-[13px] flex flex-col gap-[6px]">
@@ -456,7 +456,7 @@ export default function AdminPage() {
                   rows={3}
                   value={evento?.descripcion ?? ""}
                   onChange={(e) => setEvento((p) => (p ? { ...p, descripcion: e.target.value } : p))}
-                  className="rounded-[10px] border-[#e5e5e8] text-[15px] shadow-none"
+                  className="rounded-[10px] border-[#e5e5e8] text-base shadow-none md:text-[15px]"
                 />
               </div>
               <Button
@@ -498,7 +498,7 @@ export default function AdminPage() {
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`shrink-0 rounded-full px-[14px] py-[7px] text-[13px] font-semibold transition ${
+                  className={`min-h-11 shrink-0 rounded-full px-[14px] py-[7px] text-[13px] font-semibold transition ${
                     filter === f
                       ? "bg-[#18181b] text-white"
                       : "border border-[#e5e5e8] bg-white text-[#71717a]"
@@ -552,7 +552,7 @@ export default function AdminPage() {
           <button
             aria-label="Nuevo ente"
             onClick={() => setDialogOpen(true)}
-            className="fixed bottom-[calc(64px+16px)] right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#4338ca] text-white shadow-[0_6px_18px_rgba(67,56,202,0.35)] active:scale-95"
+            className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#4338ca] text-white shadow-[0_6px_18px_rgba(67,56,202,0.35)] active:scale-95 xl:right-[calc((100vw-56rem)/2+1rem)]"
           >
             <Plus size={26} />
           </button>
@@ -570,7 +570,7 @@ export default function AdminPage() {
                   value={newEnteName}
                   onChange={(e) => setNewEnteName(e.target.value)}
                   placeholder="Ej. Embajada de España"
-                  className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px]"
+                  className="h-12 rounded-[10px] border-[#e5e5e8] text-base md:text-[15px]"
                 />
               </div>
               <div className="flex flex-col gap-[6px]">
@@ -581,7 +581,7 @@ export default function AdminPage() {
                   max={100}
                   value={newEnteCupo}
                   onChange={(e) => setNewEnteCupo(Number(e.target.value))}
-                  className="h-12 rounded-[10px] border-[#e5e5e8] text-[15px]"
+                  className="h-12 rounded-[10px] border-[#e5e5e8] text-base md:text-[15px]"
                 />
               </div>
               <Button
@@ -598,12 +598,12 @@ export default function AdminPage() {
       )}
 
       {/* Bottom nav */}
-      <nav className="fixed bottom-0 left-1/2 z-30 flex h-16 w-full max-w-[480px] -translate-x-1/2 border-t border-[#e5e5e8] bg-white pb-[env(safe-area-inset-bottom)]">
+      <nav className="fixed bottom-0 left-1/2 z-30 flex h-[calc(4rem+env(safe-area-inset-bottom))] w-full max-w-4xl -translate-x-1/2 border-t border-[#e5e5e8] bg-white pb-[env(safe-area-inset-bottom)]">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex flex-1 flex-col items-center justify-center gap-[3px] text-[10.5px] font-semibold ${
+            className={`flex min-h-11 flex-1 flex-col items-center justify-center gap-[3px] text-[10.5px] font-semibold ${
               tab === t.key ? "text-[#4338ca]" : "text-[#71717a]"
             }`}
           >
@@ -639,14 +639,15 @@ function EnteCard({
           <Landmark size={20} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold">{ente.nombre}</div>
+          <div className="break-words text-[15px] font-semibold [overflow-wrap:anywhere]">{ente.nombre}</div>
           <div className="mt-[1px] text-xs text-[#71717a]">
             {used} de {ente.cupo_maximo} cupos usados
           </div>
         </div>
         <button
+          aria-label={`Eliminar ${ente.nombre}`}
           onClick={onDelete}
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-[#fef2f2] text-[#dc2626] active:bg-[#fee2e2]"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-[#fef2f2] text-[#dc2626] active:bg-[#fee2e2]"
         >
           <Trash2 size={18} />
         </button>
@@ -662,14 +663,16 @@ function EnteCard({
           {showPin ? "??????" : "••••••"}
         </span>
         <button
+          aria-label={showPin ? "Ocultar PIN" : "Mostrar PIN"}
           onClick={() => setShowPin((p) => !p)}
-          className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#f4f4f5] text-[#71717a] active:bg-[#e4e4e7]"
+          className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#f4f4f5] text-[#71717a] active:bg-[#e4e4e7]"
         >
           {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
         </button>
         <button
+          aria-label="Regenerar PIN"
           onClick={onRegenerate}
-          className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#f4f4f5] text-[#71717a] active:bg-[#e4e4e7]"
+          className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#f4f4f5] text-[#71717a] active:bg-[#e4e4e7]"
         >
           <RefreshCw size={18} />
         </button>
@@ -700,10 +703,10 @@ function SolicitudCard({
           {initials(s.nombre, s.apellido)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold">
+          <div className="break-words text-[15px] font-semibold [overflow-wrap:anywhere]">
             {s.nombre} {s.apellido}
           </div>
-          <div className="mt-[1px] text-xs text-[#71717a]">{s.email}</div>
+          <div className="mt-[1px] break-all text-xs text-[#71717a]">{s.email}</div>
         </div>
         <span
           className={`inline-flex shrink-0 items-center gap-[5px] rounded-full px-[10px] py-[4px] text-[11.5px] font-bold ${badgeClasses(
@@ -714,7 +717,7 @@ function SolicitudCard({
           {estadoLabel(s.estado_solicitud)}
         </span>
       </div>
-      <div className="mt-3 flex items-center gap-2 rounded-[10px] border border-[#e5e5e8] bg-[#f4f4f5] px-[13px] py-[9px] text-[13px] font-medium text-[#71717a]">
+      <div className="mt-3 flex items-center gap-2 break-words rounded-[10px] border border-[#e5e5e8] bg-[#f4f4f5] px-[13px] py-[9px] text-[13px] font-medium text-[#71717a] [overflow-wrap:anywhere]">
         <Landmark size={15} className="shrink-0 text-[#a1a1aa]" />
         {enteName}
       </div>
@@ -723,13 +726,13 @@ function SolicitudCard({
           <>
             <button
               onClick={onApprove}
-              className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#16a34a] px-3 py-[11px] text-sm font-semibold text-white active:bg-[#15803d]"
+              className="flex min-h-11 flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#16a34a] px-3 py-[11px] text-sm font-semibold text-white active:bg-[#15803d]"
             >
               <Check size={18} /> Aprobar
             </button>
             <button
               onClick={onReject}
-              className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] border border-[#fecaca] bg-white px-3 py-[11px] text-sm font-semibold text-[#dc2626] active:bg-[#fef2f2]"
+              className="flex min-h-11 flex-1 items-center justify-center gap-[7px] rounded-[10px] border border-[#fecaca] bg-white px-3 py-[11px] text-sm font-semibold text-[#dc2626] active:bg-[#fef2f2]"
             >
               <X size={18} /> Rechazar
             </button>
@@ -739,13 +742,13 @@ function SolicitudCard({
           <>
             <button
               onClick={onDownload}
-              className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#f4f4f5] px-3 py-[11px] text-sm font-semibold text-[#18181b] active:bg-[#e4e4e7]"
+              className="flex min-h-11 flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#f4f4f5] px-3 py-[11px] text-sm font-semibold text-[#18181b] active:bg-[#e4e4e7]"
             >
               <Download size={18} /> Descargar
             </button>
             <button
               onClick={onRevoke}
-              className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] border border-[#fecaca] bg-white px-3 py-[11px] text-sm font-semibold text-[#dc2626] active:bg-[#fef2f2]"
+              className="flex min-h-11 flex-1 items-center justify-center gap-[7px] rounded-[10px] border border-[#fecaca] bg-white px-3 py-[11px] text-sm font-semibold text-[#dc2626] active:bg-[#fef2f2]"
             >
               <Undo2 size={18} /> Revocar
             </button>
@@ -782,10 +785,10 @@ function InvitadoCard({
           {initials(s.nombre, s.apellido)}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="text-[15px] font-semibold">
+          <div className="break-words text-[15px] font-semibold [overflow-wrap:anywhere]">
             {s.nombre} {s.apellido}
           </div>
-          <div className="mt-[1px] text-xs text-[#71717a]">{s.cargo}</div>
+          <div className="mt-[1px] break-words text-xs text-[#71717a] [overflow-wrap:anywhere]">{s.cargo}</div>
         </div>
         <span
           className={`inline-flex shrink-0 items-center gap-[5px] rounded-full px-[10px] py-[4px] text-[11.5px] font-bold ${badgeClasses(
@@ -796,7 +799,7 @@ function InvitadoCard({
           {estadoLabel(s.estado_solicitud)}
         </span>
       </div>
-      <div className="mt-3 flex items-center gap-2 rounded-[10px] border border-[#e5e5e8] bg-[#f4f4f5] px-[13px] py-[9px] text-[13px] font-medium text-[#71717a]">
+      <div className="mt-3 flex items-center gap-2 break-words rounded-[10px] border border-[#e5e5e8] bg-[#f4f4f5] px-[13px] py-[9px] text-[13px] font-medium text-[#71717a] [overflow-wrap:anywhere]">
         <Landmark size={15} className="shrink-0 text-[#a1a1aa]" />
         {enteName}
       </div>
@@ -805,13 +808,13 @@ function InvitadoCard({
           <>
             <button
               onClick={onDownload}
-              className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#f4f4f5] px-3 py-[11px] text-sm font-semibold text-[#18181b] active:bg-[#e4e4e7]"
+              className="flex min-h-11 flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#f4f4f5] px-3 py-[11px] text-sm font-semibold text-[#18181b] active:bg-[#e4e4e7]"
             >
               <Download size={18} /> Descargar
             </button>
             <button
               onClick={onMarkSent}
-              className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#f4f4f5] px-3 py-[11px] text-sm font-semibold text-[#18181b] active:bg-[#e4e4e7]"
+              className="flex min-h-11 flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#f4f4f5] px-3 py-[11px] text-sm font-semibold text-[#18181b] active:bg-[#e4e4e7]"
             >
               <Send size={18} /> Marcar enviada
             </button>
@@ -820,7 +823,7 @@ function InvitadoCard({
         {s.estado_solicitud === "revocada" && (
           <button
             onClick={onReactivate}
-            className="flex flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#f4f4f5] px-3 py-[11px] text-sm font-semibold text-[#18181b] active:bg-[#e4e4e7]"
+            className="flex min-h-11 flex-1 items-center justify-center gap-[7px] rounded-[10px] bg-[#f4f4f5] px-3 py-[11px] text-sm font-semibold text-[#18181b] active:bg-[#e4e4e7]"
           >
             <RotateCcw size={18} /> Reactivar
           </button>
