@@ -2,7 +2,7 @@ import { z } from "zod";
 import bcryptjs from "bcryptjs";
 import { getEvento, getEntes, createEnte } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
-import { generatePin } from "@/lib/crypto-utils";
+import { generatePin, encryptPin } from "@/lib/crypto-utils";
 import { errResponse, okResponse } from "@/lib/utils-server";
 
 const createSchema = z.object({
@@ -47,10 +47,12 @@ export async function POST(request: Request) {
   }
   const pin = generatePin();
   const pinHash = await bcryptjs.hash(pin, 10);
+  const pinEncrypted = encryptPin(pin);
   const ente = await createEnte({
     evento_id: evento.id,
     nombre: parsed.data.nombre,
     pin_hash: pinHash,
+    pin_encrypted: pinEncrypted,
     cupo_maximo: parsed.data.cupo_maximo,
   });
   return okResponse({

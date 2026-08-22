@@ -55,6 +55,7 @@ export async function createEnte(data: {
   evento_id: string;
   nombre: string;
   pin_hash: string;
+  pin_encrypted: string;
   cupo_maximo?: number;
 }) {
   const rows = await db.insert(schema.ente).values(data).returning();
@@ -63,7 +64,12 @@ export async function createEnte(data: {
 
 export async function updateEnte(
   id: string,
-  data: Partial<{ nombre: string; pin_hash: string; cupo_maximo: number }>
+  data: Partial<{
+    nombre: string;
+    pin_hash: string;
+    pin_encrypted: string;
+    cupo_maximo: number;
+  }>
 ) {
   const rows = await db
     .update(schema.ente)

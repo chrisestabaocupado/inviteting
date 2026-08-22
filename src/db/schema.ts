@@ -61,6 +61,7 @@ export const ente = pgTable(
       .references(() => evento.id, { onDelete: "cascade" }),
     nombre: text("nombre").notNull(),
     pin_hash: text("pin_hash").notNull(),
+    pin_encrypted: text("pin_encrypted"),
     cupo_maximo: integer("cupo_maximo").notNull().default(5),
     creado_en: timestamp("creado_en", { withTimezone: true, mode: "date" })
       .notNull()

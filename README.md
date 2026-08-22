@@ -25,6 +25,7 @@ Copia `.env.example` a `.env` y rellena:
 | `DATABASE_URL` | URL de conexión de Neon (`postgresql://...`) |
 | `GENERAL_ACCESS_PIN` | PIN numérico de 4-20 dígitos para acceso administrativo |
 | `SESSION_SECRET` | Secreto JWT para cookies de sesión (mínimo 32 caracteres) |
+| `PIN_ENCRYPTION_KEY` | Clave para cifrar los PIN de ente (AES-256-GCM); 64 hex. Sin ella no se pueden revelar PINs |
 
 ## Configurar base de datos (Neon)
 

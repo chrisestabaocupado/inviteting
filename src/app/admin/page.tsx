@@ -16,6 +16,7 @@ import {
   Save,
   Plus,
   Landmark,
+  Copy,
   Eye,
   EyeOff,
   RefreshCw,
@@ -141,6 +142,7 @@ export default function AdminPage() {
   const [newEnteName, setNewEnteName] = useState("");
   const [newEnteCupo, setNewEnteCupo] = useState(5);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [revealedPins, setRevealedPins] = useState<Record<string, string>>({});
 
   // Check session
   useEffect(() => {
@@ -237,6 +239,8 @@ export default function AdminPage() {
     setCreatingEnte(false);
     if (d.ok) {
       toast.success(`Ente creado. PIN: ${d.data.pin}`);
+      setRevealedPins((p) => ({ ...p, [d.data.id]: d.data.pin }));
+      copyPin(d.data.pin);
       setNewEnteName("");
       setNewEnteCupo(5);
       setDialogOpen(false);
@@ -263,9 +267,31 @@ export default function AdminPage() {
     const d = await res.json();
     if (d.ok) {
       toast.success(`PIN regenerado: ${d.data.pin}`);
+      setRevealedPins((p) => ({ ...p, [id]: d.data.pin }));
+      copyPin(d.data.pin);
       loadEntes();
     } else {
       toast.error(d.error || "Error");
+    }
+  }
+
+  async function revealPin(id: string) {
+    const res = await fetch(`/api/admin/entes/${id}/pin`);
+    const d = await res.json();
+    if (d.ok) {
+      setRevealedPins((p) => ({ ...p, [id]: d.data.pin }));
+      return d.data.pin as string;
+    }
+    toast.error(d.error || "No se pudo revelar el PIN");
+    return null;
+  }
+
+  async function copyPin(pin: string) {
+    try {
+      await navigator.clipboard.writeText(pin);
+      toast.success("PIN copiado");
+    } catch {
+      toast.error("No se pudo copiar");
     }
   }
 
@@ -481,8 +507,11 @@ export default function AdminPage() {
               <EnteCard
                 key={e.id}
                 ente={e}
+                pin={revealedPins[e.id]}
                 onDelete={() => deleteEnte(e.id)}
                 onRegenerate={() => regeneratePin(e.id)}
+                onReveal={() => revealPin(e.id)}
+                onCopy={(pin) => copyPin(pin)}
               />
             ))}
           </div>
@@ -620,14 +649,21 @@ export default function AdminPage() {
 
 function EnteCard({
   ente,
+  pin,
   onDelete,
   onRegenerate,
+  onReveal,
+  onCopy,
 }: {
   ente: Ente;
+  pin?: string;
   onDelete: () => void;
   onRegenerate: () => void;
+  onReveal: () => Promise<string | null>;
+  onCopy: (pin: string) => void;
 }) {
   const [showPin, setShowPin] = useState(false);
+  const [revealing, setRevealing] = useState(false);
   // We don't have real count or used count from admin/entes endpoint; just show cupo_maximo
   const used = 0; // placeholder
   const pct = Math.min(100, (used / (ente.cupo_maximo || 1)) * 100);
@@ -660,14 +696,39 @@ function EnteCard({
       </div>
       <div className="mt-3 flex items-center gap-2">
         <span className="rounded-lg bg-[#f4f4f5] px-3 py-[7px] font-mono text-sm font-bold tracking-widest">
-          {showPin ? "??????" : "••••••"}
+          {showPin && pin ? pin : "••••••"}
         </span>
         <button
           aria-label={showPin ? "Ocultar PIN" : "Mostrar PIN"}
-          onClick={() => setShowPin((p) => !p)}
+          onClick={async () => {
+            if (!pin) {
+              setRevealing(true);
+              const p = await onReveal();
+              setRevealing(false);
+              if (p) setShowPin(true);
+            } else {
+              setShowPin((v) => !v);
+            }
+          }}
           className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#f4f4f5] text-[#71717a] active:bg-[#e4e4e7]"
         >
-          {showPin ? <EyeOff size={18} /> : <Eye size={18} />}
+          {revealing ? (
+            <Loader2 className="h-[18px] w-[18px] animate-spin" />
+          ) : showPin ? (
+            <EyeOff size={18} />
+          ) : (
+            <Eye size={18} />
+          )}
+        </button>
+        <button
+          aria-label="Copiar PIN"
+          onClick={async () => {
+            const p = pin ?? (await onReveal());
+            if (p) onCopy(p);
+          }}
+          className="flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#f4f4f5] text-[#71717a] active:bg-[#e4e4e7]"
+        >
+          <Copy size={18} />
         </button>
         <button
           aria-label="Regenerar PIN"

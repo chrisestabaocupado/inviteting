@@ -47,6 +47,7 @@ beforeAll(async () => {
     evento_id: eventoId,
     nombre: "Ente Test",
     pin_hash: pinHash,
+    pin_encrypted: "test",
     cupo_maximo: 5,
   });
   enteId = ente.id;

@@ -1,0 +1,1 @@
+ALTER TABLE "ente" ADD COLUMN "pin_encrypted" text;

@@ -1,7 +1,7 @@
 import bcryptjs from "bcryptjs";
 import { getEnteById, updateEnte } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
-import { generatePin } from "@/lib/crypto-utils";
+import { generatePin, encryptPin } from "@/lib/crypto-utils";
 import { errResponse, okResponse } from "@/lib/utils-server";
 
 export async function POST(
@@ -20,6 +20,7 @@ export async function POST(
   }
   const pin = generatePin();
   const pinHash = await bcryptjs.hash(pin, 10);
-  await updateEnte(id, { pin_hash: pinHash });
+  const pinEncrypted = encryptPin(pin);
+  await updateEnte(id, { pin_hash: pinHash, pin_encrypted: pinEncrypted });
   return okResponse({ id, pin });
 }
