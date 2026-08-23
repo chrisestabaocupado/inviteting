@@ -3,20 +3,22 @@ import bcryptjs from "bcryptjs";
 import { getEvento, getEntes, createEnte } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
 import { generatePin, encryptPin } from "@/lib/crypto-utils";
-import { errResponse, okResponse } from "@/lib/utils-server";
+import { errResponse, getEventoId, okResponse } from "@/lib/utils-server";
 
 const createSchema = z.object({
   nombre: z.string().min(1).max(200),
   cupo_maximo: z.number().int().min(1).max(100).optional().default(5),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     await requireAdmin();
   } catch {
     return errResponse("No autorizado", 401);
   }
-  const entes = await getEntes();
+  const eventoId = getEventoId(request);
+  if (!eventoId) return errResponse("Evento requerido", 400);
+  const entes = await getEntes(eventoId);
   // Nunca devolver pin_hash
   return okResponse(
     entes.map((e) => ({
@@ -36,7 +38,8 @@ export async function POST(request: Request) {
   } catch {
     return errResponse("No autorizado", 401);
   }
-  const evento = await getEvento();
+  const eventoId = getEventoId(request);
+  const evento = eventoId ? await getEvento(eventoId) : null;
   if (!evento) {
     return errResponse("No existe evento", 400);
   }

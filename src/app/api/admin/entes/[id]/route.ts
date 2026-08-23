@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { getEnteById, updateEnte, deleteEnte } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
-import { errResponse, okResponse } from "@/lib/utils-server";
+import { errResponse, getEventoId, okResponse } from "@/lib/utils-server";
 
 const patchSchema = z.object({
   nombre: z.string().min(1).max(200).optional(),
@@ -17,6 +17,11 @@ export async function PATCH(
     return errResponse("No autorizado", 401);
   }
   const { id } = await params;
+  const eventoId = getEventoId(request);
+  const existing = await getEnteById(id);
+  if (!eventoId || existing?.evento_id !== eventoId) {
+    return errResponse("Ente no encontrado", 404);
+  }
   const body = await request.json().catch(() => ({}));
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
@@ -34,7 +39,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -43,8 +48,9 @@ export async function DELETE(
     return errResponse("No autorizado", 401);
   }
   const { id } = await params;
+  const eventoId = getEventoId(request);
   const ente = await getEnteById(id);
-  if (!ente) {
+  if (!eventoId || !ente || ente.evento_id !== eventoId) {
     return errResponse("Ente no encontrado", 404);
   }
   await deleteEnte(id);

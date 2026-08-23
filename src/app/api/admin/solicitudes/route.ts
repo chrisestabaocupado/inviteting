@@ -1,7 +1,7 @@
 import { z } from "zod";
-import { getEvento, getInvitadosByEstado } from "@/db/queries";
+import { getInvitadosByEstado } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
-import { errResponse, okResponse } from "@/lib/utils-server";
+import { errResponse, getEventoId, okResponse } from "@/lib/utils-server";
 
 const querySchema = z.object({
   estado: z.enum(["pendiente", "aprobada", "rechazada", "revocada"]).optional(),
@@ -19,10 +19,8 @@ export async function GET(request: Request) {
   });
   const estado = parsed.success ? parsed.data.estado : undefined;
 
-  const evento = await getEvento();
-  if (!evento) {
-    return errResponse("No existe evento", 404);
-  }
-  const solicitudes = await getInvitadosByEstado(evento.id, estado);
+  const eventoId = getEventoId(request);
+  if (!eventoId) return errResponse("Evento requerido", 400);
+  const solicitudes = await getInvitadosByEstado(eventoId, estado);
   return okResponse(solicitudes);
 }

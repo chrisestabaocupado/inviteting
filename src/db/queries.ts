@@ -1,34 +1,62 @@
-import { eq, and, sql, inArray, count } from "drizzle-orm";
+import { eq, and, inArray, count, asc } from "drizzle-orm";
 import { db } from "./index";
 import * as schema from "./schema";
 
-export async function getEvento() {
-  const rows = await db.select().from(schema.evento).limit(1);
+export async function getEventos() {
+  return db.select().from(schema.evento).orderBy(asc(schema.evento.creado_en));
+}
+
+export async function getEvento(id?: string) {
+  const rows = id
+    ? await db
+        .select()
+        .from(schema.evento)
+        .where(eq(schema.evento.id, id))
+        .limit(1)
+    : await db.select().from(schema.evento).orderBy(asc(schema.evento.creado_en)).limit(1);
   return rows[0] ?? null;
 }
 
-export async function upsertEvento(data: {
+type EventoData = {
   nombre: string;
   fecha: string;
   hora: string;
   lugar: string;
   descripcion: string;
   inscripciones_abiertas: boolean;
-}) {
-  const existing = await getEvento();
-  if (existing) {
-    await db
-      .update(schema.evento)
-      .set({ ...data, actualizado_en: new Date() })
-      .where(eq(schema.evento.id, existing.id));
-    return { ...existing, ...data };
-  }
+};
+
+export async function createEvento(data: EventoData) {
   const rows = await db.insert(schema.evento).values(data).returning();
   return rows[0];
 }
 
-export async function getEntes() {
-  return db.select().from(schema.ente);
+export async function updateEvento(id: string, data: EventoData) {
+  const rows = await db
+    .update(schema.evento)
+    .set({ ...data, actualizado_en: new Date() })
+    .where(eq(schema.evento.id, id))
+    .returning();
+  return rows[0] ?? null;
+}
+
+export async function deleteEvento(id: string, nombre: string) {
+  const rows = await db
+    .delete(schema.evento)
+    .where(and(eq(schema.evento.id, id), eq(schema.evento.nombre, nombre)))
+    .returning({ id: schema.evento.id });
+  return rows[0] ?? null;
+}
+
+export async function upsertEvento(data: EventoData) {
+  const existing = await getEvento();
+  return existing ? updateEvento(existing.id, data) : createEvento(data);
+}
+
+export async function getEntes(eventoId?: string) {
+  return eventoId
+    ? db.select().from(schema.ente).where(eq(schema.ente.evento_id, eventoId))
+    : db.select().from(schema.ente);
 }
 
 export async function getEnteById(id: string) {
@@ -150,7 +178,6 @@ export async function insertInvitado(data: {
   evento_id: string;
   ente_id: string;
   nombre: string;
-  apellido: string;
   cargo: string;
   email: string;
   telefono: string;

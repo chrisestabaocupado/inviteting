@@ -1,10 +1,9 @@
 import { getInvitadoById, updateInvitadoEstado } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
-import { generateQrToken } from "@/lib/crypto-utils";
-import { errResponse, okResponse } from "@/lib/utils-server";
+import { errResponse, getEventoId, okResponse } from "@/lib/utils-server";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -13,8 +12,9 @@ export async function POST(
     return errResponse("No autorizado", 401);
   }
   const { id } = await params;
+  const eventoId = getEventoId(request);
   const invitado = await getInvitadoById(id);
-  if (!invitado) {
+  if (!eventoId || !invitado || invitado.evento_id !== eventoId) {
     return errResponse("Invitación no encontrada", 404);
   }
   if (invitado.estado_solicitud !== "aprobada") {

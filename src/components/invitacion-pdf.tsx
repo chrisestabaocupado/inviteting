@@ -83,7 +83,6 @@ interface InvitacionPdfProps {
   };
   invitado: {
     nombre: string;
-    apellido: string;
     cargo: string;
   };
   enteNombre: string;
@@ -111,13 +110,15 @@ export function InvitacionPdfDocument({
 
         <View style={styles.guestSection}>
           <Text style={styles.guestName}>
-            {invitado.nombre} {invitado.apellido}
+            {invitado.nombre}
           </Text>
           <Text style={styles.guestMeta}>{invitado.cargo}</Text>
           <Text style={styles.guestMeta}>{enteNombre}</Text>
         </View>
 
         <View style={styles.qrSection}>
+          {/* react-pdf's Image is not an HTML image and does not support alt. */}
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
           <Image style={styles.qrImage} src={qrDataUrl} />
           <Text style={styles.qrLabel}>Presenta este QR en la entrada</Text>
         </View>

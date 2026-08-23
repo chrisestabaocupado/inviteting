@@ -3,13 +3,15 @@ import "./setup";
 import { db } from "@/db/index";
 import * as schema from "@/db/schema";
 import {
+  createEvento,
+  deleteEvento,
   getEvento,
   upsertEvento,
   createEnte,
   getEnteById,
-  deleteEnte,
   getInvitadoById,
-  getInvitadoByToken,
+  getEntes,
+  getInvitadosByEvento,
   getEntradaByInvitado,
   countInvitadosPorEnte,
   insertInvitado,
@@ -19,6 +21,7 @@ import {
 import { generateQrToken } from "@/lib/crypto-utils";
 import bcryptjs from "bcryptjs";
 import { eq } from "drizzle-orm";
+import { POST as registrarSolicitud } from "@/app/api/registro/solicitud/route";
 
 async function cleanAll() {
   await db.delete(schema.entrada);
@@ -57,6 +60,137 @@ afterAll(async () => {
   await cleanAll();
 });
 
+async function createRegistrationContext(cupoMaximo = 5) {
+  const evento = await createEvento({
+    nombre: `Evento lote ${Date.now()}-${Math.random()}`,
+    fecha: "2026-11-20",
+    hora: "18:00",
+    lugar: "Caracas",
+    descripcion: "Prueba de lote",
+    inscripciones_abiertas: true,
+  });
+  const ente = await createEnte({
+    evento_id: evento.id,
+    nombre: `Ente lote ${Date.now()}-${Math.random()}`,
+    pin_hash: pinHash,
+    pin_encrypted: "test",
+    cupo_maximo: cupoMaximo,
+  });
+  return { evento, ente };
+}
+
+async function postRegistration(payload: unknown) {
+  return registrarSolicitud(
+    new Request("http://localhost/api/registro/solicitud", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+  );
+}
+
+function batchPayload(eventoId: string, enteId: string) {
+  return {
+    evento_id: eventoId,
+    ente_id: enteId,
+    pin: "123456",
+    confirmacion: true,
+    personas: [
+      {
+        nombre: "Ana Pérez",
+        cargo: "Directora",
+        email: `ana-${Date.now()}@example.com`,
+        telefono: "04120000001",
+      },
+      {
+        nombre: "Luis Gómez",
+        cargo: "Coordinador",
+        email: `luis-${Date.now()}@example.com`,
+        telefono: "04120000002",
+      },
+    ],
+  };
+}
+
+describe("Registro público en lote", () => {
+  it("inserta todas las personas del lote", async () => {
+    const { evento, ente } = await createRegistrationContext();
+    const payload = batchPayload(evento.id, ente.id);
+    const response = await postRegistration(payload);
+    const body = (await response.json()) as {
+      ok: boolean;
+      data: Array<{ nombre: string }>;
+    };
+
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.data.map((item) => item.nombre)).toEqual([
+      "Ana Pérez",
+      "Luis Gómez",
+    ]);
+    expect(await getInvitadosByEvento(evento.id)).toHaveLength(2);
+  });
+
+  it("rechaza correos repetidos dentro del lote sin insertar filas", async () => {
+    const { evento, ente } = await createRegistrationContext();
+    const payload = batchPayload(evento.id, ente.id);
+    payload.personas[1].email = payload.personas[0].email.toUpperCase();
+
+    const response = await postRegistration(payload);
+
+    expect(response.status).toBe(409);
+    expect(await getInvitadosByEvento(evento.id)).toHaveLength(0);
+  });
+
+  it("revierte todo el lote si un correo ya está registrado", async () => {
+    const { evento, ente } = await createRegistrationContext();
+    const payload = batchPayload(evento.id, ente.id);
+    await insertInvitado({
+      evento_id: evento.id,
+      ente_id: ente.id,
+      nombre: "Ana Pérez",
+      cargo: "Directora",
+      email: payload.personas[0].email.toUpperCase(),
+      telefono: "04120000001",
+      confirmacion: true,
+      origen: "publico",
+      estado_solicitud: "pendiente",
+    });
+
+    const response = await postRegistration(payload);
+
+    expect(response.status).toBe(409);
+    expect(await getInvitadosByEvento(evento.id)).toHaveLength(1);
+  });
+
+  it("revierte todo el lote cuando no alcanza el cupo", async () => {
+    const { evento, ente } = await createRegistrationContext(1);
+    const response = await postRegistration(batchPayload(evento.id, ente.id));
+
+    expect(response.status).toBe(409);
+    expect(await getInvitadosByEvento(evento.id)).toHaveLength(0);
+  });
+
+  it("serializa dos lotes concurrentes para no exceder el cupo", async () => {
+    const { evento, ente } = await createRegistrationContext(3);
+    const first = batchPayload(evento.id, ente.id);
+    const second = batchPayload(evento.id, ente.id);
+    second.personas[0].email = `otra-ana-${Date.now()}@example.com`;
+    second.personas[1].email = `otro-luis-${Date.now()}@example.com`;
+
+    const responses = await Promise.all([
+      postRegistration(first),
+      postRegistration(second),
+    ]);
+
+    expect(responses.map((response) => response.status).sort()).toEqual([
+      200,
+      409,
+    ]);
+    expect(await getInvitadosByEvento(evento.id)).toHaveLength(2);
+  });
+});
+
 describe("Reglas transaccionales", () => {
   it("PIN ente válido permite registrar", async () => {
     const valid = await bcryptjs.compare("123456", pinHash);
@@ -69,8 +203,7 @@ describe("Reglas transaccionales", () => {
       await insertInvitado({
         evento_id: eventoId,
         ente_id: enteId,
-        nombre: `Persona${i}`,
-        apellido: `Apellido${i}`,
+         nombre: `Persona${i} Apellido${i}`,
         cargo: "Cargo",
         email: `u${i}@test.com`,
         telefono: "0412000000",
@@ -90,6 +223,7 @@ describe("Reglas transaccionales", () => {
           .from(schema.ente)
           .where(eq(schema.ente.id, enteId))
           .for("update");
+        const enteData = enteRows[0];
         const usedRows = await txDb
           .select({ count: db.$count(schema.invitado) })
           .from(schema.invitado)
@@ -99,11 +233,13 @@ describe("Reglas transaccionales", () => {
               enteId
             )
           );
-        // Nota: en tx real usamos inArray, aquí simplificado; mejor contar fuera
-        throw new Error("Cupo agotado para este ente");
+        if (usedRows[0].count + 1 > enteData.cupo_maximo) {
+          throw new Error("Cupo agotado para este ente");
+        }
       });
-    } catch (e: any) {
-      expect(e.message).toContain("Cupo agotado");
+    } catch (e) {
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toContain("Cupo agotado");
     }
   });
 
@@ -111,8 +247,7 @@ describe("Reglas transaccionales", () => {
     const inv = await insertInvitado({
       evento_id: eventoId,
       ente_id: enteId,
-      nombre: "Rechazado",
-      apellido: "Test",
+      nombre: "Rechazado Test",
       cargo: "Cargo",
       email: "rechazado@test.com",
       telefono: "0412000000",
@@ -128,11 +263,10 @@ describe("Reglas transaccionales", () => {
 
   it("email duplicado se rechaza", async () => {
     const email = "dup@test.com";
-    const inv1 = await insertInvitado({
+    await insertInvitado({
       evento_id: eventoId,
       ente_id: enteId,
-      nombre: "Dup1",
-      apellido: "Test",
+      nombre: "Dup1 Test",
       cargo: "Cargo",
       email,
       telefono: "0412000000",
@@ -153,8 +287,9 @@ describe("Reglas transaccionales", () => {
           throw new Error("El email ya está registrado");
         }
       });
-    } catch (e: any) {
-      expect(e.message).toContain("registrado");
+    } catch (e) {
+      expect(e).toBeInstanceOf(Error);
+      expect((e as Error).message).toContain("registrado");
     }
   });
 
@@ -162,8 +297,7 @@ describe("Reglas transaccionales", () => {
     const inv = await insertInvitado({
       evento_id: eventoId,
       ente_id: enteId,
-      nombre: "Aprobar",
-      apellido: "Test",
+      nombre: "Aprobar Test",
       cargo: "Cargo",
       email: "aprobar@test.com",
       telefono: "0412000000",
@@ -179,8 +313,7 @@ describe("Reglas transaccionales", () => {
     const inv2 = await insertInvitado({
       evento_id: eventoId,
       ente_id: enteId,
-      nombre: "Rechazar",
-      apellido: "Test",
+      nombre: "Rechazar Test",
       cargo: "Cargo",
       email: "rechazar2@test.com",
       telefono: "0412000000",
@@ -199,8 +332,7 @@ describe("Reglas transaccionales", () => {
     const inv = await insertInvitado({
       evento_id: eventoId,
       ente_id: enteId,
-      nombre: "Manual",
-      apellido: "Test",
+      nombre: "Manual Test",
       cargo: "Cargo",
       email: "manual@test.com",
       telefono: "0412000000",
@@ -220,8 +352,7 @@ describe("Reglas transaccionales", () => {
     const inv = await insertInvitado({
       evento_id: eventoId,
       ente_id: enteId,
-      nombre: "Scan",
-      apellido: "Test",
+      nombre: "Scan Test",
       cargo: "Cargo",
       email: "scan@test.com",
       telefono: "0412000000",
@@ -236,5 +367,79 @@ describe("Reglas transaccionales", () => {
 
     const second = await getEntradaByInvitado(inv.id);
     expect(second?.creado_en.getTime()).toBe(first.creado_en.getTime());
+  });
+
+  it("aísla entes e invitados entre eventos", async () => {
+    const otroEvento = await createEvento({
+      nombre: "Otro Evento",
+      fecha: "2026-09-20",
+      hora: "20:00",
+      lugar: "Valencia",
+      descripcion: "Segundo workspace",
+      inscripciones_abiertas: true,
+    });
+    const otroEnte = await createEnte({
+      evento_id: otroEvento.id,
+      nombre: "Ente Otro",
+      pin_hash: pinHash,
+      pin_encrypted: "test",
+      cupo_maximo: 5,
+    });
+    await insertInvitado({
+      evento_id: otroEvento.id,
+      ente_id: otroEnte.id,
+      nombre: "Invitado Otro",
+      cargo: "Cargo",
+      email: "otro@test.com",
+      telefono: "0412000000",
+      confirmacion: true,
+      origen: "publico",
+      estado_solicitud: "pendiente",
+    });
+
+    expect((await getEntes(eventoId)).some((item) => item.id === otroEnte.id)).toBe(false);
+    expect(await getEntes(otroEvento.id)).toHaveLength(1);
+    expect(await getInvitadosByEvento(eventoId)).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ email: "otro@test.com" })])
+    );
+    expect(await getInvitadosByEvento(otroEvento.id)).toHaveLength(1);
+  });
+
+  it("eliminar un evento elimina sus registros en cascada", async () => {
+    const evento = await createEvento({
+      nombre: "Evento para eliminar",
+      fecha: "2026-10-20",
+      hora: "20:00",
+      lugar: "Maracay",
+      descripcion: "Cascade test",
+      inscripciones_abiertas: true,
+    });
+    const ente = await createEnte({
+      evento_id: evento.id,
+      nombre: "Ente para eliminar",
+      pin_hash: pinHash,
+      pin_encrypted: "test",
+      cupo_maximo: 5,
+    });
+    const invitado = await insertInvitado({
+      evento_id: evento.id,
+      ente_id: ente.id,
+      nombre: "Invitado Cascade",
+      cargo: "Cargo",
+      email: "cascade@test.com",
+      telefono: "0412000000",
+      confirmacion: true,
+      origen: "manual",
+      estado_solicitud: "aprobada",
+      token_qr: generateQrToken(),
+    });
+    await insertEntrada(invitado.id);
+
+    expect(await deleteEvento(evento.id, "Nombre incorrecto")).toBeNull();
+    expect(await deleteEvento(evento.id, evento.nombre)).toEqual({ id: evento.id });
+    expect(await getEvento(evento.id)).toBeNull();
+    expect(await getEnteById(ente.id)).toBeNull();
+    expect(await getInvitadoById(invitado.id)).toBeNull();
+    expect(await getEntradaByInvitado(invitado.id)).toBeNull();
   });
 });

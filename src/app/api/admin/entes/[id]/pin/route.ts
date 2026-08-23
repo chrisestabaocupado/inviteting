@@ -1,10 +1,10 @@
 import { getEnteById } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
 import { decryptPin } from "@/lib/crypto-utils";
-import { errResponse, okResponse } from "@/lib/utils-server";
+import { errResponse, getEventoId, okResponse } from "@/lib/utils-server";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -13,8 +13,9 @@ export async function GET(
     return errResponse("No autorizado", 401);
   }
   const { id } = await params;
+  const eventoId = getEventoId(request);
   const ente = await getEnteById(id);
-  if (!ente) {
+  if (!eventoId || !ente || ente.evento_id !== eventoId) {
     return errResponse("Ente no encontrado", 404);
   }
   if (!ente.pin_encrypted) {

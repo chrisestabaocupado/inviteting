@@ -17,8 +17,16 @@ interface ScanResult {
   hora_entrada: string;
 }
 
+interface Evento {
+  id: string;
+  nombre: string;
+}
+
 export default function ScannerPage() {
   const [authed, setAuthed] = useState(false);
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [evento, setEvento] = useState<Evento | null>(null);
+  const [scanInFlight, setScanInFlight] = useState(false);
   const [checking, setChecking] = useState(true);
   const [scanState, setScanState] = useState<ScanState>("idle");
   const [result, setResult] = useState<ScanResult | null>(null);
@@ -31,6 +39,7 @@ export default function ScannerPage() {
   const pauseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scanStateRef = useRef<ScanState>("idle");
   const scanInFlightRef = useRef(false);
+  const activeEventoIdRef = useRef<string | null>(null);
   const cameraCleanupRef = useRef<Promise<void>>(Promise.resolve());
 
   // Check session
@@ -44,6 +53,24 @@ export default function ScannerPage() {
       .finally(() => setChecking(false));
   }, []);
 
+  useEffect(() => {
+    if (!authed) return;
+    fetch("/api/admin/evento")
+      .then((r) => r.json())
+      .then((d) => {
+        if (!d.ok) return;
+        const rows = d.data as Evento[];
+        const requestedId = new URLSearchParams(window.location.search).get("evento");
+        const selected = requestedId
+          ? rows.find((item) => item.id === requestedId) ?? null
+          : rows[0] ?? null;
+        activeEventoIdRef.current = selected?.id ?? null;
+        setEventos(rows);
+        setEvento(selected);
+        if (selected) window.history.replaceState(null, "", `/scanner?evento=${selected.id}`);
+      });
+  }, [authed]);
+
   const pauseScan = useCallback(() => {
     if (pauseTimer.current) clearTimeout(pauseTimer.current);
     pauseTimer.current = setTimeout(() => {
@@ -54,15 +81,23 @@ export default function ScannerPage() {
   }, []);
 
   const handleScan = useCallback(async (token: string) => {
-    if (scanStateRef.current !== "idle" || scanInFlightRef.current) return;
+    if (
+      !evento ||
+      activeEventoIdRef.current !== evento.id ||
+      scanStateRef.current !== "idle" ||
+      scanInFlightRef.current
+    ) return;
+    const scannedEventoId = evento.id;
     scanInFlightRef.current = true;
+    setScanInFlight(true);
     try {
       const res = await fetch("/api/scanner/validar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify({ evento_id: evento.id, token }),
       });
       const data = await res.json().catch(() => ({}));
+      if (activeEventoIdRef.current !== scannedEventoId) return;
       if (!res.ok || !data.ok) {
         scanStateRef.current = "invalid";
         setScanState("invalid");
@@ -85,13 +120,14 @@ export default function ScannerPage() {
       pauseScan();
     } finally {
       scanInFlightRef.current = false;
+      setScanInFlight(false);
     }
-  }, [pauseScan]);
+  }, [evento, pauseScan]);
 
   // Start camera. Some Android browsers require the permission request to be
   // triggered by a user gesture, so the UI also exposes a retry button.
   useEffect(() => {
-    if (!authed) return;
+    if (!authed || !evento) return;
     const el = cameraRef.current;
     if (!el) return;
 
@@ -199,7 +235,7 @@ export default function ScannerPage() {
         });
       cameraCleanupRef.current = cleanup;
     };
-  }, [authed, cameraAttempt, handleScan]);
+  }, [authed, evento, cameraAttempt, handleScan]);
 
   async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -242,7 +278,26 @@ export default function ScannerPage() {
               <ScanLine size={20} />
               Escáner de entrada
             </div>
-            <div className="mt-[2px] text-[13px] text-[#a1a1aa]">Cena de Gala Anual 2026</div>
+            <select
+              aria-label="Evento activo"
+              value={evento?.id ?? ""}
+              disabled={scanInFlight}
+              onChange={(e) => {
+                const selected = eventos.find((item) => item.id === e.target.value) ?? null;
+                activeEventoIdRef.current = selected?.id ?? null;
+                scanStateRef.current = "idle";
+                setScanState("idle");
+                setResult(null);
+                setEvento(selected);
+                if (selected) window.history.replaceState(null, "", `/scanner?evento=${selected.id}`);
+              }}
+              className="mt-[2px] block max-w-[58vw] cursor-pointer truncate bg-[#09090b] text-[13px] text-[#a1a1aa] outline-none"
+            >
+              {!evento && <option value="">Sin eventos</option>}
+              {eventos.map((item) => (
+                <option key={item.id} value={item.id}>{item.nombre}</option>
+              ))}
+            </select>
           </div>
           <button
             onClick={logout}

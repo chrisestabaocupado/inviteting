@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   Ticket,
   CalendarDays,
@@ -29,6 +29,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -52,6 +60,16 @@ interface Evento {
   inscripciones_abiertas: boolean;
 }
 
+const emptyEvento: Evento = {
+  id: "",
+  nombre: "",
+  fecha: "",
+  hora: "",
+  lugar: "",
+  descripcion: "",
+  inscripciones_abiertas: false,
+};
+
 interface Ente {
   id: string;
   nombre: string;
@@ -61,7 +79,6 @@ interface Ente {
 interface Solicitud {
   id: string;
   nombre: string;
-  apellido: string;
   cargo: string;
   email: string;
   telefono: string;
@@ -89,14 +106,9 @@ const estadosFiltro: ("todas" | Solicitud["estado_solicitud"])[] = [
 ];
 
 /* ---------- Helpers ---------- */
-function initials(nombre: string, apellido: string) {
-  return `${nombre?.[0] ?? ""}${apellido?.[0] ?? ""}`.toUpperCase();
-}
-
-function formatDate(d: string) {
-  if (!d) return "";
-  const [y, m, day] = d.split("-");
-  return `${day}/${m}/${y}`;
+function initials(nombre: string) {
+  const partes = nombre.trim().split(/\s+/);
+  return `${partes[0]?.[0] ?? ""}${partes.at(-1)?.[0] ?? ""}`.toUpperCase();
 }
 
 function badgeClasses(estado: string) {
@@ -118,21 +130,20 @@ function estadoLabel(e: string) {
   return e.charAt(0).toUpperCase() + e.slice(1);
 }
 
+function withEvento(eventoId: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("x-evento-id", eventoId);
+  return { ...init, headers };
+}
+
 /* ---------- Page ---------- */
 export default function AdminPage() {
   const [authed, setAuthed] = useState(false);
   const [checking, setChecking] = useState(true);
   const [tab, setTab] = useState<Tab>("solicitudes");
 
-  const [evento, setEvento] = useState<Evento | null>({
-    id: "",
-    nombre: "",
-    fecha: "",
-    hora: "",
-    lugar: "",
-    descripcion: "",
-    inscripciones_abiertas: false,
-  });
+  const [eventos, setEventos] = useState<Evento[]>([]);
+  const [evento, setEvento] = useState<Evento | null>(null);
   const [entes, setEntes] = useState<Ente[]>([]);
   const [solicitudes, setSolicitudes] = useState<Solicitud[]>([]);
   const [filter, setFilter] = useState<"todas" | Solicitud["estado_solicitud"]>("todas");
@@ -142,7 +153,12 @@ export default function AdminPage() {
   const [newEnteName, setNewEnteName] = useState("");
   const [newEnteCupo, setNewEnteCupo] = useState(5);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deletingEvento, setDeletingEvento] = useState(false);
   const [revealedPins, setRevealedPins] = useState<Record<string, string>>({});
+  const activeEventoId = useRef<string | null>(null);
+  const solicitudesRequest = useRef(0);
 
   // Check session
   useEffect(() => {
@@ -155,86 +171,162 @@ export default function AdminPage() {
       .finally(() => setChecking(false));
   }, []);
 
-  // Load data when authed or tab changes
+  const loadEventosEffect = useEffectEvent(loadEventos);
+
+  // Load workspaces after authentication.
   useEffect(() => {
     if (!authed) return;
-    loadEvento();
-    if (tab === "entes") loadEntes();
-    if (tab === "solicitudes" || tab === "invitados") loadSolicitudes();
-  }, [authed, tab]);
+    loadEventosEffect();
+  }, [authed]);
 
-  async function loadEvento() {
+  async function loadEventos() {
     setLoading(true);
     const res = await fetch("/api/admin/evento");
     const d = await res.json();
-    if (d.ok) setEvento(d.data);
+    if (d.ok) {
+      const rows = d.data as Evento[];
+      const requestedId = new URLSearchParams(window.location.search).get("evento");
+      const selected = requestedId
+        ? rows.find((item) => item.id === requestedId) ?? null
+        : rows[0] ?? null;
+      activeEventoId.current = selected?.id ?? null;
+      setEventos(rows);
+      setEvento(selected ?? emptyEvento);
+      if (selected) {
+        window.history.replaceState(null, "", `/admin?evento=${selected.id}`);
+        await Promise.all([loadEntes(selected.id), loadSolicitudes(selected.id)]);
+      } else {
+        setTab("evento");
+        if (requestedId) toast.error("Evento no encontrado");
+      }
+    }
     setLoading(false);
   }
 
-  async function loadEntes() {
+  async function loadEntes(eventoId = evento?.id) {
+    if (!eventoId) return;
     setLoading(true);
-    const res = await fetch("/api/admin/entes");
+    const res = await fetch("/api/admin/entes", withEvento(eventoId));
     const d = await res.json();
-    if (d.ok) setEntes(d.data);
+    if (d.ok && activeEventoId.current === eventoId) setEntes(d.data);
     setLoading(false);
   }
 
-  async function loadSolicitudes() {
+  async function loadSolicitudes(eventoId = evento?.id) {
+    if (!eventoId) return;
+    const requestId = ++solicitudesRequest.current;
     setLoading(true);
     const url = filter === "todas" ? "/api/admin/solicitudes" : `/api/admin/solicitudes?estado=${filter}`;
-    const res = await fetch(url);
+    const res = await fetch(url, withEvento(eventoId));
     const d = await res.json();
-    if (d.ok) setSolicitudes(d.data);
+    if (
+      d.ok &&
+      activeEventoId.current === eventoId &&
+      solicitudesRequest.current === requestId
+    ) setSolicitudes(d.data);
     setLoading(false);
   }
 
+  const loadWorkspaceEffect = useEffectEvent((eventoId: string) => {
+    loadEntes(eventoId);
+    if (tab === "solicitudes" || tab === "invitados") loadSolicitudes(eventoId);
+  });
+
   useEffect(() => {
-    if (authed && (tab === "solicitudes" || tab === "invitados")) loadSolicitudes();
-  }, [filter]);
+    if (!authed || !evento?.id) return;
+    loadWorkspaceEffect(evento.id);
+  }, [authed, tab, filter, evento?.id]);
+
+  function selectEvento(id: string) {
+    const selected = eventos.find((item) => item.id === id);
+    if (!selected) return;
+    activeEventoId.current = selected.id;
+    setEvento(selected);
+    setEntes([]);
+    setSolicitudes([]);
+    setRevealedPins({});
+    window.history.replaceState(null, "", `/admin?evento=${selected.id}`);
+  }
+
+  function newEvento() {
+    activeEventoId.current = null;
+    setEvento(emptyEvento);
+    setEntes([]);
+    setSolicitudes([]);
+    setRevealedPins({});
+    setTab("evento");
+    window.history.replaceState(null, "", "/admin");
+  }
 
   async function saveEvento() {
     if (!evento) return;
+    const requestedId = evento.id || null;
     setSavingEvento(true);
     const res = await fetch("/api/admin/evento", {
-      method: "PUT",
+      method: evento.id ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(evento),
     });
     const d = await res.json();
     setSavingEvento(false);
+    if (activeEventoId.current !== requestedId) return;
     if (d.ok) {
+      activeEventoId.current = d.data.id;
+      setEvento(d.data);
+      setEventos((items) =>
+        evento.id
+          ? items.map((item) => (item.id === d.data.id ? d.data : item))
+          : [...items, d.data]
+      );
+      window.history.replaceState(null, "", `/admin?evento=${d.data.id}`);
       toast.success("Cambios guardados");
     } else {
       toast.error(d.error || "Error al guardar");
     }
   }
 
-  async function toggleInscripciones(v: boolean) {
-    if (!evento) return;
-    const next = { ...evento, inscripciones_abiertas: v };
-    setEvento(next);
+  async function deleteCurrentEvento() {
+    if (!evento?.id || deleteConfirmation !== evento.nombre) return;
+    setDeletingEvento(true);
     const res = await fetch("/api/admin/evento", {
-      method: "PUT",
+      method: "DELETE",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(next),
+      body: JSON.stringify({ id: evento.id, confirmacion: deleteConfirmation }),
     });
     const d = await res.json();
-    if (d.ok) {
-      toast.success(v ? "Inscripciones abiertas" : "Inscripciones cerradas");
-    } else {
-      toast.error(d.error || "Error al actualizar");
-      setEvento(evento);
+    setDeletingEvento(false);
+    if (!d.ok) {
+      toast.error(d.error || "No se pudo eliminar el evento");
+      return;
     }
+
+    const remaining = eventos.filter((item) => item.id !== evento.id);
+    const next = remaining[0] ?? null;
+    activeEventoId.current = next?.id ?? null;
+    setEventos(remaining);
+    setEvento(next ?? emptyEvento);
+    setEntes([]);
+    setSolicitudes([]);
+    setRevealedPins({});
+    setDeleteConfirmation("");
+    setDeleteDialogOpen(false);
+    if (next) {
+      window.history.replaceState(null, "", `/admin?evento=${next.id}`);
+    } else {
+      setTab("evento");
+      window.history.replaceState(null, "", "/admin");
+    }
+    toast.success("Evento y registros asociados eliminados");
   }
 
   async function createEnte() {
-    if (!newEnteName.trim()) return;
+    if (!newEnteName.trim() || !evento?.id) return;
     setCreatingEnte(true);
-    const res = await fetch("/api/admin/entes", {
+    const res = await fetch("/api/admin/entes", withEvento(evento.id, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ nombre: newEnteName.trim(), cupo_maximo: newEnteCupo }),
-    });
+    }));
     const d = await res.json();
     setCreatingEnte(false);
     if (d.ok) {
@@ -251,8 +343,8 @@ export default function AdminPage() {
   }
 
   async function deleteEnte(id: string) {
-    if (!confirm("¿Eliminar este ente?")) return;
-    const res = await fetch(`/api/admin/entes/${id}`, { method: "DELETE" });
+    if (!evento?.id || !confirm("¿Eliminar este ente?")) return;
+    const res = await fetch(`/api/admin/entes/${id}`, withEvento(evento.id, { method: "DELETE" }));
     const d = await res.json();
     if (d.ok) {
       toast.success("Ente eliminado");
@@ -263,7 +355,8 @@ export default function AdminPage() {
   }
 
   async function regeneratePin(id: string) {
-    const res = await fetch(`/api/admin/entes/${id}/regenerar-pin`, { method: "POST" });
+    if (!evento?.id) return;
+    const res = await fetch(`/api/admin/entes/${id}/regenerar-pin`, withEvento(evento.id, { method: "POST" }));
     const d = await res.json();
     if (d.ok) {
       toast.success(`PIN regenerado: ${d.data.pin}`);
@@ -276,7 +369,8 @@ export default function AdminPage() {
   }
 
   async function revealPin(id: string) {
-    const res = await fetch(`/api/admin/entes/${id}/pin`);
+    if (!evento?.id) return null;
+    const res = await fetch(`/api/admin/entes/${id}/pin`, withEvento(evento.id));
     const d = await res.json();
     if (d.ok) {
       setRevealedPins((p) => ({ ...p, [id]: d.data.pin }));
@@ -296,7 +390,8 @@ export default function AdminPage() {
   }
 
   async function approve(id: string) {
-    const res = await fetch(`/api/admin/solicitudes/${id}/aprobar`, { method: "POST" });
+    if (!evento?.id) return;
+    const res = await fetch(`/api/admin/solicitudes/${id}/aprobar`, withEvento(evento.id, { method: "POST" }));
     const d = await res.json();
     if (d.ok) {
       toast.success("Solicitud aprobada · token QR generado");
@@ -307,7 +402,8 @@ export default function AdminPage() {
   }
 
   async function reject(id: string) {
-    const res = await fetch(`/api/admin/solicitudes/${id}/rechazar`, { method: "POST" });
+    if (!evento?.id) return;
+    const res = await fetch(`/api/admin/solicitudes/${id}/rechazar`, withEvento(evento.id, { method: "POST" }));
     const d = await res.json();
     if (d.ok) {
       toast.success("Solicitud rechazada");
@@ -318,7 +414,8 @@ export default function AdminPage() {
   }
 
   async function revoke(id: string) {
-    const res = await fetch(`/api/admin/solicitudes/${id}/revocar`, { method: "POST" });
+    if (!evento?.id) return;
+    const res = await fetch(`/api/admin/solicitudes/${id}/revocar`, withEvento(evento.id, { method: "POST" }));
     const d = await res.json();
     if (d.ok) {
       toast.success("Invitación revocada");
@@ -329,21 +426,22 @@ export default function AdminPage() {
   }
 
   async function downloadInvitacion(id: string) {
-    const res = await fetch(`/api/admin/invitacion/${id}`);
+    if (!evento?.id) return;
+    const res = await fetch(`/api/admin/invitacion/${id}`, withEvento(evento.id));
     const d = await res.json();
     if (!d.ok) {
       toast.error(d.error || "Error");
       return;
     }
-    const { invitado, ente, evento } = d.data;
-    if (!invitado?.token_qr || !evento) {
+    const { invitado, ente, evento: pdfEvento } = d.data;
+    if (!invitado?.token_qr || !pdfEvento) {
       toast.error("Faltan datos para generar PDF");
       return;
     }
     const qrDataUrl = await QRCode.toDataURL(invitado.token_qr, { width: 400, margin: 2 });
     const blob = await pdf(
       <InvitacionPdfDocument
-        evento={evento}
+        evento={pdfEvento}
         invitado={invitado}
         enteNombre={ente?.nombre ?? "—"}
         qrDataUrl={qrDataUrl}
@@ -352,7 +450,7 @@ export default function AdminPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `invitacion-${invitado.nombre}-${invitado.apellido}.pdf`;
+    a.download = `invitacion-${invitado.nombre}.pdf`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -361,7 +459,8 @@ export default function AdminPage() {
   }
 
   async function markSent(id: string) {
-    const res = await fetch(`/api/admin/solicitudes/${id}/marcar-enviada`, { method: "POST" });
+    if (!evento?.id) return;
+    const res = await fetch(`/api/admin/solicitudes/${id}/marcar-enviada`, withEvento(evento.id, { method: "POST" }));
     const d = await res.json();
     if (d.ok) {
       toast.success("Marcada como enviada");
@@ -369,12 +468,6 @@ export default function AdminPage() {
     } else {
       toast.error(d.error || "Error");
     }
-  }
-
-  async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    setAuthed(false);
-    toast.success("Sesión cerrada");
   }
 
   const counts = useMemo(() => {
@@ -409,19 +502,70 @@ export default function AdminPage() {
       {/* App bar */}
       <div className="sticky top-0 z-30 border-b border-[#e5e5e8] bg-white px-4 py-[12px_10px]">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-[10px]">
+          <div className="flex min-w-0 flex-1 items-center gap-[10px]">
             <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#4338ca] text-white">
               <Ticket size={20} />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="text-base font-bold tracking-tight">inviteting</div>
-              <div className="truncate text-xs text-[#71717a]">{evento?.nombre ?? "—"}</div>
+              <Select
+                value={evento?.id || null}
+                onValueChange={(value) => {
+                  if (value === "new") newEvento();
+                  else if (typeof value === "string") selectEvento(value);
+                }}
+              >
+                <SelectTrigger
+                  aria-label="Evento activo"
+                  className="h-8 w-full rounded-[9px] border-[#e5e5e8] bg-[#fafafa] px-2.5 py-0 text-xs font-semibold text-[#3f3f46] shadow-none hover:border-[#c7d2fe] hover:bg-[#eef2ff] focus-visible:border-[#818cf8] focus-visible:ring-[3px] focus-visible:ring-[rgba(99,102,241,0.15)]"
+                >
+                  <CalendarDays className="text-[#6366f1]" />
+                  <SelectValue className="min-w-0 truncate">
+                    {evento?.nombre || "Selecciona un evento"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent
+                  align="start"
+                  alignItemWithTrigger={false}
+                  className="rounded-[12px] p-1.5 shadow-[0_12px_32px_rgba(24,24,27,0.14)]"
+                >
+                  {eventos.map((item) => (
+                    <SelectItem
+                      key={item.id}
+                      value={item.id}
+                      className="min-h-14 rounded-[9px] px-2.5 py-2 focus:bg-[#eef2ff]"
+                    >
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-[#eef2ff] text-[#4f46e5]">
+                          <CalendarDays size={17} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-[13px] font-semibold text-[#18181b]">
+                            {item.nombre}
+                          </span>
+                          <span className="block truncate text-[11.5px] text-[#71717a]">
+                            {item.fecha} · {item.lugar}
+                          </span>
+                        </span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                  {eventos.length > 0 && <SelectSeparator className="my-1.5" />}
+                  <SelectItem
+                    value="new"
+                    className="min-h-12 rounded-[9px] px-2.5 py-2 font-semibold text-[#4f46e5] focus:bg-[#eef2ff] focus:text-[#4338ca]"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#eef2ff]">
+                        <Plus size={17} />
+                      </span>
+                      Crear nuevo evento
+                    </span>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
-          <Switch
-            checked={evento?.inscripciones_abiertas ?? false}
-            onCheckedChange={toggleInscripciones}
-          />
         </div>
         <div className="mt-[9px] flex items-center gap-[6px] text-xs font-semibold">
           <span
@@ -438,11 +582,14 @@ export default function AdminPage() {
         {tab === "evento" && (
           <div className="mx-auto max-w-2xl">
             <h2 className="mt-[6px] text-[19px] font-bold tracking-tight">Datos del evento</h2>
-            <p className="mb-[14px] text-[13px] text-[#71717a]">El único evento de esta instancia.</p>
+             <p className="mb-[14px] text-[13px] text-[#71717a]">
+               {evento?.id ? "Los entes e invitados pertenecen a este evento." : "Completa los datos para crear un evento."}
+             </p>
             <div className="mb-3 rounded-[14px] border border-[#e5e5e8] bg-white p-[14px]">
               <div className="mb-[13px] flex flex-col gap-[6px]">
-                <Label className="text-[13px] font-semibold">Nombre del evento</Label>
-                <Input
+                 <Label htmlFor="evento-nombre" className="text-[13px] font-semibold">Nombre del evento</Label>
+                 <Input
+                   id="evento-nombre"
                   value={evento?.nombre ?? ""}
                   onChange={(e) => setEvento((p) => (p ? { ...p, nombre: e.target.value } : p))}
                   className="h-12 rounded-[10px] border-[#e5e5e8] text-base shadow-none md:text-[15px]"
@@ -450,8 +597,9 @@ export default function AdminPage() {
               </div>
               <div className="mb-[13px] grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div className="flex flex-col gap-[6px]">
-                  <Label className="text-[13px] font-semibold">Fecha</Label>
-                  <Input
+                   <Label htmlFor="evento-fecha" className="text-[13px] font-semibold">Fecha</Label>
+                   <Input
+                     id="evento-fecha"
                     type="date"
                     value={evento?.fecha ?? ""}
                     onChange={(e) => setEvento((p) => (p ? { ...p, fecha: e.target.value } : p))}
@@ -459,8 +607,9 @@ export default function AdminPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-[6px]">
-                  <Label className="text-[13px] font-semibold">Hora</Label>
-                  <Input
+                   <Label htmlFor="evento-hora" className="text-[13px] font-semibold">Hora</Label>
+                   <Input
+                     id="evento-hora"
                     type="time"
                     value={evento?.hora ?? ""}
                     onChange={(e) => setEvento((p) => (p ? { ...p, hora: e.target.value } : p))}
@@ -469,20 +618,42 @@ export default function AdminPage() {
                 </div>
               </div>
               <div className="mb-[13px] flex flex-col gap-[6px]">
-                <Label className="text-[13px] font-semibold">Lugar</Label>
-                <Input
+                 <Label htmlFor="evento-lugar" className="text-[13px] font-semibold">Lugar</Label>
+                 <Input
+                   id="evento-lugar"
                   value={evento?.lugar ?? ""}
                   onChange={(e) => setEvento((p) => (p ? { ...p, lugar: e.target.value } : p))}
                   className="h-12 rounded-[10px] border-[#e5e5e8] text-base shadow-none md:text-[15px]"
                 />
               </div>
               <div className="mb-[13px] flex flex-col gap-[6px]">
-                <Label className="text-[13px] font-semibold">Descripción</Label>
-                <Textarea
+                 <Label htmlFor="evento-descripcion" className="text-[13px] font-semibold">Descripción</Label>
+                 <Textarea
+                   id="evento-descripcion"
                   rows={3}
                   value={evento?.descripcion ?? ""}
                   onChange={(e) => setEvento((p) => (p ? { ...p, descripcion: e.target.value } : p))}
                   className="rounded-[10px] border-[#e5e5e8] text-base shadow-none md:text-[15px]"
+                />
+              </div>
+              <div className="mb-[13px] flex min-h-16 items-center justify-between gap-4 rounded-[11px] border border-[#e5e5e8] bg-[#fafafa] px-3.5 py-3">
+                <div className="min-w-0">
+                  <Label htmlFor="inscripciones-evento" className="text-[13.5px] font-semibold">
+                    Inscripciones abiertas
+                  </Label>
+                  <p className="mt-0.5 text-xs text-[#71717a]">
+                    Permite que los invitados envíen nuevas solicitudes.
+                  </p>
+                </div>
+                <Switch
+                  id="inscripciones-evento"
+                  checked={evento?.inscripciones_abiertas ?? false}
+                  onCheckedChange={(value) =>
+                    setEvento((current) =>
+                      current ? { ...current, inscripciones_abiertas: value } : current
+                    )
+                  }
+                  disabled={!evento}
                 />
               </div>
               <Button
@@ -493,6 +664,36 @@ export default function AdminPage() {
                 {savingEvento ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save size={18} />}
                 Guardar cambios
               </Button>
+              {evento?.id && (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <a
+                    href={`/registro?evento=${evento.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-h-11 items-center justify-center rounded-[10px] border border-[#e5e5e8] text-sm font-semibold"
+                  >
+                    Abrir registro
+                  </a>
+                  <a
+                    href={`/scanner?evento=${evento.id}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-h-11 items-center justify-center rounded-[10px] border border-[#e5e5e8] text-sm font-semibold"
+                  >
+                    Abrir escáner
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDeleteConfirmation("");
+                      setDeleteDialogOpen(true);
+                    }}
+                    className="col-span-2 flex min-h-11 items-center justify-center gap-2 rounded-[10px] border border-[#fecaca] text-sm font-semibold text-[#dc2626] active:bg-[#fef2f2]"
+                  >
+                    <Trash2 size={17} /> Eliminar evento
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -626,15 +827,50 @@ export default function AdminPage() {
         </Dialog>
       )}
 
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="rounded-[14px] border-[#fecaca]">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold text-[#dc2626]">Eliminar evento</DialogTitle>
+            <DialogDescription className="text-sm text-[#71717a]">
+              Esta acción es irreversible. Se eliminarán en cascada todos sus entes,
+              solicitudes, invitados y registros de entrada.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-2 flex flex-col gap-3">
+            <div className="flex flex-col gap-[6px]">
+              <Label htmlFor="delete-event-confirmation" className="text-[13px] font-semibold">
+                Escribe <span className="font-bold text-[#18181b]">{evento?.nombre}</span> para confirmar
+              </Label>
+              <Input
+                id="delete-event-confirmation"
+                autoComplete="off"
+                value={deleteConfirmation}
+                onChange={(e) => setDeleteConfirmation(e.target.value)}
+                className="h-12 rounded-[10px] border-[#fecaca] text-base md:text-[15px]"
+              />
+            </div>
+            <Button
+              onClick={deleteCurrentEvento}
+              disabled={deletingEvento || deleteConfirmation !== evento?.nombre}
+              className="h-12 w-full rounded-[11px] bg-[#dc2626] text-[15px] font-semibold text-white hover:bg-[#b91c1c]"
+            >
+              {deletingEvento ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Trash2 size={18} />}
+              Eliminar definitivamente
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Bottom nav */}
       <nav className="fixed bottom-0 left-1/2 z-30 flex h-[calc(4rem+env(safe-area-inset-bottom))] w-full max-w-4xl -translate-x-1/2 border-t border-[#e5e5e8] bg-white pb-[env(safe-area-inset-bottom)]">
         {tabs.map((t) => (
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
+            disabled={!evento?.id && t.key !== "evento"}
             className={`flex min-h-11 flex-1 flex-col items-center justify-center gap-[3px] text-[10.5px] font-semibold ${
               tab === t.key ? "text-[#4338ca]" : "text-[#71717a]"
-            }`}
+            } disabled:opacity-40`}
           >
             {t.icon}
             {t.label}
@@ -761,11 +997,11 @@ function SolicitudCard({
     <div className="mb-3 rounded-[14px] border border-[#e5e5e8] bg-white p-[14px]">
       <div className="flex items-start gap-3">
         <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] bg-[#eef2ff] text-[15px] font-bold text-[#4338ca]">
-          {initials(s.nombre, s.apellido)}
+          {initials(s.nombre)}
         </div>
         <div className="min-w-0 flex-1">
           <div className="break-words text-[15px] font-semibold [overflow-wrap:anywhere]">
-            {s.nombre} {s.apellido}
+            {s.nombre}
           </div>
           <div className="mt-[1px] break-all text-xs text-[#71717a]">{s.email}</div>
         </div>
@@ -843,11 +1079,11 @@ function InvitadoCard({
     <div className="mb-3 rounded-[14px] border border-[#e5e5e8] bg-white p-[14px]">
       <div className="flex items-start gap-3">
         <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] bg-[#eef2ff] text-[15px] font-bold text-[#4338ca]">
-          {initials(s.nombre, s.apellido)}
+          {initials(s.nombre)}
         </div>
         <div className="min-w-0 flex-1">
           <div className="break-words text-[15px] font-semibold [overflow-wrap:anywhere]">
-            {s.nombre} {s.apellido}
+            {s.nombre}
           </div>
           <div className="mt-[1px] break-words text-xs text-[#71717a] [overflow-wrap:anywhere]">{s.cargo}</div>
         </div>

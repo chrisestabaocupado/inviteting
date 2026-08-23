@@ -5,12 +5,11 @@ import {
   insertEntrada,
   getEnteById,
 } from "@/db/queries";
-import { db } from "@/db/index";
-import { entrada as entradaTable } from "@/db/schema";
 import { requireAdmin } from "@/lib/auth";
 import { errResponse, okResponse } from "@/lib/utils-server";
 
 const bodySchema = z.object({
+  evento_id: z.string().uuid(),
   token: z.string().min(1),
 });
 
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   const invitado = await getInvitadoByToken(parsed.data.token);
-  if (!invitado) {
+  if (!invitado || invitado.evento_id !== parsed.data.evento_id) {
     return errResponse("Token inválido", 404);
   }
   if (invitado.estado_solicitud !== "aprobada") {
@@ -39,7 +38,7 @@ export async function POST(request: Request) {
   if (existente) {
     return okResponse({
       estado: "ya_utilizado",
-      nombre: `${invitado.nombre} ${invitado.apellido}`,
+      nombre: invitado.nombre,
       cargo: invitado.cargo,
       ente: (await getEnteById(invitado.ente_id))?.nombre ?? null,
       hora_entrada: existente.creado_en,
@@ -51,7 +50,7 @@ export async function POST(request: Request) {
     const entry = await insertEntrada(invitado.id);
     return okResponse({
       estado: "valida",
-      nombre: `${invitado.nombre} ${invitado.apellido}`,
+      nombre: invitado.nombre,
       cargo: invitado.cargo,
       ente: (await getEnteById(invitado.ente_id))?.nombre ?? null,
       hora_entrada: entry.creado_en,
@@ -63,7 +62,7 @@ export async function POST(request: Request) {
       const existente2 = await getEntradaByInvitado(invitado.id);
       return okResponse({
         estado: "ya_utilizado",
-        nombre: `${invitado.nombre} ${invitado.apellido}`,
+        nombre: invitado.nombre,
         cargo: invitado.cargo,
         ente: (await getEnteById(invitado.ente_id))?.nombre ?? null,
         hora_entrada: existente2?.creado_en ?? new Date(),

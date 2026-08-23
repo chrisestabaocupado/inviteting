@@ -1,41 +1,34 @@
-import { z } from "zod";
 import bcryptjs from "bcryptjs";
-import {
-  getEvento,
-  getEnteById,
-  countInvitadosPorEnte,
-} from "@/db/queries";
-import { checkRateLimit, recordFailed, recordSuccess, makeHuella } from "@/lib/rate-limit";
-import { generateQrToken } from "@/lib/crypto-utils";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/index";
 import { ente, invitado as invitadoTable } from "@/db/schema";
-import { eq, and, count, inArray } from "drizzle-orm";
+import { getEnteById, getEvento } from "@/db/queries";
+import {
+  checkRateLimit,
+  makeHuella,
+  recordFailed,
+  recordSuccess,
+} from "@/lib/rate-limit";
+import { solicitudRegistroSchema } from "@/lib/registro";
 import { errResponse, okResponse } from "@/lib/utils-server";
 
-const solicitudSchema = z.object({
-  ente_id: z.string().uuid(),
-  pin: z.string().length(6).regex(/^\d{6}$/),
-  nombre: z.string().min(1).max(200),
-  apellido: z.string().min(1).max(200),
-  cargo: z.string().min(1).max(200),
-  email: z.string().email(),
-  telefono: z.string().min(1).max(50),
-  confirmacion: z.boolean().optional().default(false),
-});
-
 export async function POST(request: Request) {
-  const evento = await getEvento();
-  if (!evento) {
-    return errResponse("No existe evento", 400);
-  }
-  if (!evento.inscripciones_abiertas) {
-    return errResponse("Las inscripciones están cerradas", 403);
-  }
-
   const body = await request.json().catch(() => ({}));
-  const parsed = solicitudSchema.safeParse(body);
+  const parsed = solicitudRegistroSchema.safeParse(body);
+
   if (!parsed.success) {
     return errResponse("Datos inválidos", 400);
+  }
+
+  const emails = parsed.data.personas.map((persona) => persona.email);
+  if (new Set(emails).size !== emails.length) {
+    return errResponse("Hay correos repetidos en la solicitud", 409);
+  }
+
+  const evento = await getEvento(parsed.data.evento_id);
+  if (!evento) return errResponse("No existe evento", 400);
+  if (!evento.inscripciones_abiertas) {
+    return errResponse("Las inscripciones están cerradas", 403);
   }
 
   const enteRow = await getEnteById(parsed.data.ente_id);
@@ -43,11 +36,13 @@ export async function POST(request: Request) {
     return errResponse("Ente no válido", 400);
   }
 
-  // Rate-limit por PIN ente
-  const huella = makeHuella("pin-ente", `${enteRow.id}:${parsed.data.pin}`);
-  const rl = await checkRateLimit(huella, "pin_ente");
-  if (!rl.ok) {
-    return errResponse(rl.error, rl.status);
+  const huella = makeHuella(
+    "pin-ente",
+    `${enteRow.id}:${parsed.data.pin}`
+  );
+  const rateLimit = await checkRateLimit(huella, "pin_ente");
+  if (!rateLimit.ok) {
+    return errResponse(rateLimit.error, rateLimit.status);
   }
 
   const validPin = await bcryptjs.compare(parsed.data.pin, enteRow.pin_hash);
@@ -57,9 +52,6 @@ export async function POST(request: Request) {
   }
   await recordSuccess(huella);
 
-  const email = parsed.data.email.trim().toLowerCase();
-
-  // Transacción: FOR UPDATE + chequeo cupo + insert
   try {
     const result = await db.transaction(async (txDb) => {
       const enteRows = await txDb
@@ -67,9 +59,11 @@ export async function POST(request: Request) {
         .from(ente)
         .where(eq(ente.id, parsed.data.ente_id))
         .for("update");
-      if (!enteRows.length) {
-        throw new Error("Ente no encontrado");
+
+      if (!enteRows.length || enteRows[0].evento_id !== evento.id) {
+        throw new Error("Ente no válido");
       }
+
       const enteData = enteRows[0];
       const usedRows = await txDb
         .select({ count: count() })
@@ -80,54 +74,73 @@ export async function POST(request: Request) {
             inArray(invitadoTable.estado_solicitud, ["pendiente", "aprobada"])
           )
         );
-      const used = usedRows[0].count;
-      if (used >= enteData.cupo_maximo) {
+
+      if (
+        usedRows[0].count + parsed.data.personas.length >
+        enteData.cupo_maximo
+      ) {
         throw new Error("Cupo agotado para este ente");
       }
 
-      // Chequeo email único (parcial: pendiente/aprobada)
-      const dupRows = await txDb
-        .select()
+      const duplicateRows = await txDb
+        .select({ email: invitadoTable.email })
         .from(invitadoTable)
         .where(
           and(
             eq(invitadoTable.evento_id, evento.id),
-            eq(invitadoTable.email, email),
+            sql`lower(${invitadoTable.email}) in (${sql.join(
+              emails.map((email) => sql`${email}`),
+              sql`, `
+            )})`,
             inArray(invitadoTable.estado_solicitud, ["pendiente", "aprobada"])
           )
         )
         .limit(1);
-      if (dupRows.length) {
-        throw new Error("El email ya está registrado");
+
+      if (duplicateRows.length) {
+        throw new Error("Uno de los correos ya está registrado");
       }
 
-      const inv = await txDb
+      return txDb
         .insert(invitadoTable)
-        .values({
-          evento_id: evento.id,
-          ente_id: enteData.id,
-          nombre: parsed.data.nombre,
-          apellido: parsed.data.apellido,
-          cargo: parsed.data.cargo,
-          email,
-          telefono: parsed.data.telefono,
-          confirmacion: parsed.data.confirmacion,
-          origen: "publico",
-          estado_solicitud: "pendiente",
-          estado_invitacion: "no_enviada",
-        })
+        .values(
+          parsed.data.personas.map((persona) => ({
+            evento_id: evento.id,
+            ente_id: enteData.id,
+            nombre: persona.nombre,
+            cargo: persona.cargo,
+            email: persona.email,
+            telefono: persona.telefono,
+            confirmacion: parsed.data.confirmacion,
+            origen: "publico" as const,
+            estado_solicitud: "pendiente" as const,
+            estado_invitacion: "no_enviada" as const,
+          }))
+        )
         .returning();
-      return inv[0];
     });
+
     return okResponse(result);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Error desconocido";
-    if (msg.includes("Cupo agotado")) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    const databaseError = error as { code?: string; constraint?: string };
+
+    if (message.includes("Cupo agotado")) {
       return errResponse("Cupo agotado para este ente", 409);
     }
-    if (msg.includes("email") || msg.includes("Email") || msg.includes("registrado")) {
-      return errResponse("El email ya está registrado", 409);
+
+    if (
+      message.includes("registrado") ||
+      (databaseError.code === "23505" &&
+        databaseError.constraint === "invitado_email_unico")
+    ) {
+      return errResponse("Uno de los correos ya está registrado", 409);
     }
-    throw e;
+
+    if (message.includes("Ente no válido")) {
+      return errResponse("Ente no válido", 400);
+    }
+
+    throw error;
   }
 }

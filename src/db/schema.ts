@@ -89,7 +89,6 @@ export const invitado = pgTable(
       .notNull()
       .references(() => ente.id, { onDelete: "cascade" }),
     nombre: text("nombre").notNull(),
-    apellido: text("apellido").notNull(),
     cargo: text("cargo").notNull(),
     email: text("email").notNull(),
     telefono: text("telefono").notNull(),
