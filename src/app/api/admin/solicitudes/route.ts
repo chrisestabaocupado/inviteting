@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getInvitadosByEstado } from "@/db/queries";
+import { getInvitadosConDetalle } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
 import { errResponse, getEventoId, okResponse } from "@/lib/utils-server";
 
@@ -21,6 +21,6 @@ export async function GET(request: Request) {
 
   const eventoId = getEventoId(request);
   if (!eventoId) return errResponse("Evento requerido", 400);
-  const solicitudes = await getInvitadosByEstado(eventoId, estado);
+  const solicitudes = await getInvitadosConDetalle(eventoId, estado);
   return okResponse(solicitudes);
 }

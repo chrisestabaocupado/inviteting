@@ -174,6 +174,35 @@ export async function getInvitadosByEstado(
   return getInvitadosByEvento(eventoId);
 }
 
+export async function getInvitadosConDetalle(
+  eventoId: string,
+  estado?: "pendiente" | "aprobada" | "rechazada" | "revocada"
+) {
+  const rows = await db
+    .select({
+      invitado: schema.invitado,
+      ente_nombre: schema.ente.nombre,
+      escaneado_en: schema.entrada.creado_en,
+    })
+    .from(schema.invitado)
+    .leftJoin(schema.ente, eq(schema.invitado.ente_id, schema.ente.id))
+    .leftJoin(schema.entrada, eq(schema.invitado.id, schema.entrada.invitado_id))
+    .where(
+      estado
+        ? and(
+            eq(schema.invitado.evento_id, eventoId),
+            eq(schema.invitado.estado_solicitud, estado)
+          )
+        : eq(schema.invitado.evento_id, eventoId)
+    )
+    .orderBy(asc(schema.invitado.creado_en));
+  return rows.map((r) => ({
+    ...r.invitado,
+    ente_nombre: r.ente_nombre,
+    escaneado_en: r.escaneado_en,
+  }));
+}
+
 export async function insertInvitado(data: {
   evento_id: string;
   ente_id: string;

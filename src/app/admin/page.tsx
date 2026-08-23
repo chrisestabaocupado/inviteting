@@ -86,6 +86,8 @@ interface Solicitud {
   estado_solicitud: "pendiente" | "aprobada" | "rechazada" | "revocada";
   estado_invitacion: "no_enviada" | "enviada";
   token_qr: string | null;
+  ente_nombre: string | null;
+  escaneado_en: string | null;
 }
 
 type Tab = "evento" | "entes" | "solicitudes" | "invitados";
@@ -128,6 +130,57 @@ function badgeClasses(estado: string) {
 
 function estadoLabel(e: string) {
   return e.charAt(0).toUpperCase() + e.slice(1);
+}
+
+function formatDateTime(iso: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return isNaN(d.getTime())
+    ? ""
+    : d.toLocaleString("es-VE", { dateStyle: "short", timeStyle: "short" });
+}
+
+function csvCell(value: unknown) {
+  const s = value == null ? "" : String(value);
+  return `"${s.replace(/"/g, '""')}"`;
+}
+
+function toCsv(rows: Solicitud[]) {
+  const header = [
+    "nombre",
+    "cargo",
+    "email",
+    "telefono",
+    "ente",
+    "estado",
+    "escaneado",
+  ];
+  const lines = rows.map((s) =>
+    [
+      s.nombre,
+      s.cargo,
+      s.email,
+      s.telefono,
+      s.ente_nombre ?? "",
+      s.estado_solicitud,
+      formatDateTime(s.escaneado_en),
+    ]
+      .map(csvCell)
+      .join(",")
+  );
+  return [header.map(csvCell).join(","), ...lines].join("\n");
+}
+
+function downloadCsv(filename: string, csv: string) {
+  const blob = new Blob(["\ufeff" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 function withEvento(eventoId: string, init: RequestInit = {}) {
@@ -470,6 +523,25 @@ export default function AdminPage() {
     }
   }
 
+  async function exportCsv() {
+    if (!evento?.id) return;
+    const res = await fetch("/api/admin/solicitudes", withEvento(evento.id));
+    const d = await res.json();
+    if (!d.ok) {
+      toast.error(d.error || "Error al exportar");
+      return;
+    }
+    const rows = d.data as Solicitud[];
+    const pendientes = rows.filter((s) => s.estado_solicitud === "pendiente");
+    const aprobadas = rows.filter((s) => s.estado_solicitud === "aprobada");
+    downloadCsv(`invitados-pendientes.csv`, toCsv(pendientes));
+    setTimeout(
+      () => downloadCsv(`invitados-aprobadas.csv`, toCsv(aprobadas)),
+      200
+    );
+    toast.success("CSV exportados");
+  }
+
   const counts = useMemo(() => {
     return {
       todas: solicitudes.length,
@@ -566,6 +638,15 @@ export default function AdminPage() {
               </Select>
             </div>
           </div>
+          <button
+            onClick={exportCsv}
+            disabled={!evento?.id}
+            className="flex h-11 shrink-0 items-center justify-center gap-[7px] rounded-[10px] border border-[#e5e5e8] bg-white px-3 text-[13px] font-semibold text-[#18181b] active:bg-[#f4f4f5] disabled:opacity-40"
+            title="Exportar registro de invitados a CSV"
+          >
+            <Download size={17} />
+            <span className="hidden sm:inline">CSV</span>
+          </button>
         </div>
         <div className="mt-[9px] flex items-center gap-[6px] text-xs font-semibold">
           <span
@@ -1018,6 +1099,18 @@ function SolicitudCard({
         <Landmark size={15} className="shrink-0 text-[#a1a1aa]" />
         {enteName}
       </div>
+      {s.estado_solicitud === "aprobada" && (
+        <div className="mt-3 flex items-center gap-2 text-[12.5px] font-semibold">
+          <span
+            className={`h-[7px] w-[7px] rounded-full ${s.escaneado_en ? "bg-[#16a34a]" : "bg-[#a1a1aa]"}`}
+          />
+          <span className={s.escaneado_en ? "text-[#16a34a]" : "text-[#71717a]"}>
+            {s.escaneado_en
+              ? `Escaneado · ${formatDateTime(s.escaneado_en)}`
+              : "No escaneado"}
+          </span>
+        </div>
+      )}
       <div className="mt-3 flex gap-2">
         {s.estado_solicitud === "pendiente" && (
           <>
@@ -1100,6 +1193,18 @@ function InvitadoCard({
         <Landmark size={15} className="shrink-0 text-[#a1a1aa]" />
         {enteName}
       </div>
+      {s.estado_solicitud === "aprobada" && (
+        <div className="mt-3 flex items-center gap-2 text-[12.5px] font-semibold">
+          <span
+            className={`h-[7px] w-[7px] rounded-full ${s.escaneado_en ? "bg-[#16a34a]" : "bg-[#a1a1aa]"}`}
+          />
+          <span className={s.escaneado_en ? "text-[#16a34a]" : "text-[#71717a]"}>
+            {s.escaneado_en
+              ? `Escaneado · ${formatDateTime(s.escaneado_en)}`
+              : "No escaneado"}
+          </span>
+        </div>
+      )}
       <div className="mt-3 flex gap-2">
         {s.estado_solicitud === "aprobada" && (
           <>
