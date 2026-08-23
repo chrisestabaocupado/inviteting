@@ -74,6 +74,7 @@ interface Ente {
   id: string;
   nombre: string;
   cupo_maximo: number;
+  cupos_usados: number;
 }
 
 interface Solicitud {
@@ -981,8 +982,7 @@ function EnteCard({
 }) {
   const [showPin, setShowPin] = useState(false);
   const [revealing, setRevealing] = useState(false);
-  // We don't have real count or used count from admin/entes endpoint; just show cupo_maximo
-  const used = 0; // placeholder
+  const used = ente.cupos_usados;
   const pct = Math.min(100, (used / (ente.cupo_maximo || 1)) * 100);
 
   return (

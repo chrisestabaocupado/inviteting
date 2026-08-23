@@ -1,4 +1,4 @@
-import { getInvitadoById, updateInvitadoEstado } from "@/db/queries";
+import { getInvitadoById, aprobarInvitado } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
 import { generateQrToken } from "@/lib/crypto-utils";
 import { errResponse, getEventoId, okResponse } from "@/lib/utils-server";
@@ -22,6 +22,13 @@ export async function POST(
     return errResponse("La solicitud no está pendiente", 400);
   }
   const token = generateQrToken();
-  const updated = await updateInvitadoEstado(id, "aprobada", { token_qr: token });
-  return okResponse(updated);
+  try {
+    const updated = await aprobarInvitado(id, token);
+    return okResponse(updated);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("Cupo agotado")) {
+      return errResponse("Cupo agotado para este ente", 409);
+    }
+    throw error;
+  }
 }

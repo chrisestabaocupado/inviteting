@@ -57,7 +57,7 @@ export async function POST(request: Request) {
         .where(
           and(
             eq(invitadoTable.ente_id, enteData.id),
-            inArray(invitadoTable.estado_solicitud, ["pendiente", "aprobada"])
+            eq(invitadoTable.estado_solicitud, "aprobada")
           )
         );
       const used = usedRows[0].count;

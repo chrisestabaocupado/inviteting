@@ -1,4 +1,4 @@
-import { eq, and, inArray, count, asc } from "drizzle-orm";
+import { eq, and, count, asc } from "drizzle-orm";
 import { db } from "./index";
 import * as schema from "./schema";
 
@@ -118,7 +118,7 @@ export async function countInvitadosPorEnte(enteId: string) {
     .where(
       and(
         eq(schema.invitado.ente_id, enteId),
-        inArray(schema.invitado.estado_solicitud, ["pendiente", "aprobada"])
+        eq(schema.invitado.estado_solicitud, "aprobada")
       )
     );
   return rows[0].count;
@@ -245,6 +245,53 @@ export async function updateInvitadoEstado(
     .where(eq(schema.invitado.id, id))
     .returning();
   return rows[0] ?? null;
+}
+
+export async function aprobarInvitado(id: string, token: string) {
+  return db.transaction(async (txDb) => {
+    const inv = await txDb
+      .select()
+      .from(schema.invitado)
+      .where(eq(schema.invitado.id, id))
+      .limit(1);
+    if (!inv.length || inv[0].estado_solicitud !== "pendiente") {
+      return null;
+    }
+    const enteRows = await txDb
+      .select()
+      .from(schema.ente)
+      .where(eq(schema.ente.id, inv[0].ente_id))
+      .for("update");
+    if (!enteRows.length) return null;
+    const usedRows = await txDb
+      .select({ count: count() })
+      .from(schema.invitado)
+      .where(
+        and(
+          eq(schema.invitado.ente_id, inv[0].ente_id),
+          eq(schema.invitado.estado_solicitud, "aprobada")
+        )
+      );
+    if (usedRows[0].count >= enteRows[0].cupo_maximo) {
+      throw new Error("Cupo agotado para este ente");
+    }
+    const rows = await txDb
+      .update(schema.invitado)
+      .set({
+        estado_solicitud: "aprobada",
+        token_qr: token,
+        aprobado_en: new Date(),
+        actualizado_en: new Date(),
+      })
+      .where(
+        and(
+          eq(schema.invitado.id, id),
+          eq(schema.invitado.estado_solicitud, "pendiente")
+        )
+      )
+      .returning();
+    return rows[0] ?? null;
+  });
 }
 
 export async function markInvitacionEnviada(id: string) {

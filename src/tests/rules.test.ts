@@ -16,6 +16,7 @@ import {
   countInvitadosPorEnte,
   insertInvitado,
   updateInvitadoEstado,
+  aprobarInvitado,
   insertEntrada,
 } from "@/db/queries";
 import { generateQrToken } from "@/lib/crypto-utils";
@@ -163,15 +164,16 @@ describe("Registro público en lote", () => {
     expect(await getInvitadosByEvento(evento.id)).toHaveLength(1);
   });
 
-  it("revierte todo el lote cuando no alcanza el cupo", async () => {
+  it("el registro pendiente no consume cupo", async () => {
     const { evento, ente } = await createRegistrationContext(1);
     const response = await postRegistration(batchPayload(evento.id, ente.id));
 
-    expect(response.status).toBe(409);
-    expect(await getInvitadosByEvento(evento.id)).toHaveLength(0);
+    expect(response.status).toBe(200);
+    expect(await getInvitadosByEvento(evento.id)).toHaveLength(2);
+    expect(await countInvitadosPorEnte(ente.id)).toBe(0);
   });
 
-  it("serializa dos lotes concurrentes para no exceder el cupo", async () => {
+  it("varios lotes pendientes no se bloquean por cupo", async () => {
     const { evento, ente } = await createRegistrationContext(3);
     const first = batchPayload(evento.id, ente.id);
     const second = batchPayload(evento.id, ente.id);
@@ -185,9 +187,10 @@ describe("Registro público en lote", () => {
 
     expect(responses.map((response) => response.status).sort()).toEqual([
       200,
-      409,
+      200,
     ]);
-    expect(await getInvitadosByEvento(evento.id)).toHaveLength(2);
+    expect(await getInvitadosByEvento(evento.id)).toHaveLength(4);
+    expect(await countInvitadosPorEnte(ente.id)).toBe(0);
   });
 });
 
@@ -197,66 +200,58 @@ describe("Reglas transaccionales", () => {
     expect(valid).toBe(true);
   });
 
-  it("5ª solicitud ocupa último cupo y 6ª se rechaza", async () => {
-    // Llenar 5 cupos
-    for (let i = 0; i < 5; i++) {
-      await insertInvitado({
-        evento_id: eventoId,
-        ente_id: enteId,
-         nombre: `Persona${i} Apellido${i}`,
-        cargo: "Cargo",
-        email: `u${i}@test.com`,
-        telefono: "0412000000",
-        confirmacion: false,
-        origen: "publico",
-        estado_solicitud: "pendiente",
-      });
-    }
-    const count = await countInvitadosPorEnte(enteId);
-    expect(count).toBe(5);
+  it("aprobar consume cupo y rechaza cuando está lleno", async () => {
+    const { evento, ente } = await createRegistrationContext(1);
 
-    // 6ª debe fallar por cupo
-    try {
-      await db.transaction(async (txDb) => {
-        const enteRows = await txDb
-          .select()
-          .from(schema.ente)
-          .where(eq(schema.ente.id, enteId))
-          .for("update");
-        const enteData = enteRows[0];
-        const usedRows = await txDb
-          .select({ count: db.$count(schema.invitado) })
-          .from(schema.invitado)
-          .where(
-            eq(
-              schema.invitado.ente_id,
-              enteId
-            )
-          );
-        if (usedRows[0].count + 1 > enteData.cupo_maximo) {
-          throw new Error("Cupo agotado para este ente");
-        }
-      });
-    } catch (e) {
-      expect(e).toBeInstanceOf(Error);
-      expect((e as Error).message).toContain("Cupo agotado");
-    }
-  });
-
-  it("rechazar libera cupo", async () => {
     const inv = await insertInvitado({
-      evento_id: eventoId,
-      ente_id: enteId,
-      nombre: "Rechazado Test",
+      evento_id: evento.id,
+      ente_id: ente.id,
+      nombre: "Pendiente Cupo",
       cargo: "Cargo",
-      email: "rechazado@test.com",
+      email: "pendiente-cupo@test.com",
       telefono: "0412000000",
       confirmacion: false,
       origen: "publico",
       estado_solicitud: "pendiente",
     });
+    expect(await countInvitadosPorEnte(ente.id)).toBe(0);
+
+    const approved = await aprobarInvitado(inv.id, generateQrToken());
+    expect(approved?.estado_solicitud).toBe("aprobada");
+    expect(await countInvitadosPorEnte(ente.id)).toBe(1);
+
+    const inv2 = await insertInvitado({
+      evento_id: evento.id,
+      ente_id: ente.id,
+      nombre: "Pendiente Cupo 2",
+      cargo: "Cargo",
+      email: "pendiente-cupo-2@test.com",
+      telefono: "0412000000",
+      confirmacion: false,
+      origen: "publico",
+      estado_solicitud: "pendiente",
+    });
+    await expect(
+      aprobarInvitado(inv2.id, generateQrToken())
+    ).rejects.toThrow("Cupo agotado");
+    expect(await countInvitadosPorEnte(ente.id)).toBe(1);
+  });
+
+  it("revocar libera cupo", async () => {
+    const inv = await insertInvitado({
+      evento_id: eventoId,
+      ente_id: enteId,
+      nombre: "Revocar Test",
+      cargo: "Cargo",
+      email: "revocar@test.com",
+      telefono: "0412000000",
+      confirmacion: false,
+      origen: "publico",
+      estado_solicitud: "aprobada",
+      token_qr: generateQrToken(),
+    });
     const before = await countInvitadosPorEnte(enteId);
-    await updateInvitadoEstado(inv.id, "rechazada");
+    await updateInvitadoEstado(inv.id, "revocada");
     const after = await countInvitadosPorEnte(enteId);
     expect(after).toBe(before - 1);
   });

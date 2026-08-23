@@ -42,7 +42,7 @@ pnpm exec drizzle-kit migrate
 
 Cada evento expone enlaces propios de registro y escáner con `?evento=<id>` desde la pestaña **Evento**.
 
-El registro múltiple es atómico: si falta cupo o alguno de los correos ya está registrado, no se crea ninguna persona del envío.
+El registro múltiple es atómico: si alguno de los correos ya está registrado, no se crea ninguna persona del envío. El cupo del ente se consume al **aprobar** la solicitud (una solicitud pendiente no ocupa cupo).
 
 ## Scripts
 

@@ -1,7 +1,7 @@
 import bcryptjs from "bcryptjs";
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/index";
-import { ente, invitado as invitadoTable } from "@/db/schema";
+import { invitado as invitadoTable } from "@/db/schema";
 import { getEnteById, getEvento } from "@/db/queries";
 import {
   checkRateLimit,
@@ -54,34 +54,6 @@ export async function POST(request: Request) {
 
   try {
     const result = await db.transaction(async (txDb) => {
-      const enteRows = await txDb
-        .select()
-        .from(ente)
-        .where(eq(ente.id, parsed.data.ente_id))
-        .for("update");
-
-      if (!enteRows.length || enteRows[0].evento_id !== evento.id) {
-        throw new Error("Ente no válido");
-      }
-
-      const enteData = enteRows[0];
-      const usedRows = await txDb
-        .select({ count: count() })
-        .from(invitadoTable)
-        .where(
-          and(
-            eq(invitadoTable.ente_id, enteData.id),
-            inArray(invitadoTable.estado_solicitud, ["pendiente", "aprobada"])
-          )
-        );
-
-      if (
-        usedRows[0].count + parsed.data.personas.length >
-        enteData.cupo_maximo
-      ) {
-        throw new Error("Cupo agotado para este ente");
-      }
-
       const duplicateRows = await txDb
         .select({ email: invitadoTable.email })
         .from(invitadoTable)
@@ -106,7 +78,7 @@ export async function POST(request: Request) {
         .values(
           parsed.data.personas.map((persona) => ({
             evento_id: evento.id,
-            ente_id: enteData.id,
+            ente_id: enteRow.id,
             nombre: persona.nombre,
             cargo: persona.cargo,
             email: persona.email,
@@ -125,20 +97,12 @@ export async function POST(request: Request) {
     const message = error instanceof Error ? error.message : "";
     const databaseError = error as { code?: string; constraint?: string };
 
-    if (message.includes("Cupo agotado")) {
-      return errResponse("Cupo agotado para este ente", 409);
-    }
-
     if (
       message.includes("registrado") ||
       (databaseError.code === "23505" &&
         databaseError.constraint === "invitado_email_unico")
     ) {
       return errResponse("Uno de los correos ya está registrado", 409);
-    }
-
-    if (message.includes("Ente no válido")) {
-      return errResponse("Ente no válido", 400);
     }
 
     throw error;

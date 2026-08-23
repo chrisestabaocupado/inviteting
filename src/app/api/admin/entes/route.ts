@@ -1,6 +1,6 @@
 import { z } from "zod";
 import bcryptjs from "bcryptjs";
-import { getEvento, getEntes, createEnte } from "@/db/queries";
+import { getEvento, getEntes, createEnte, countInvitadosPorEnte } from "@/db/queries";
 import { requireAdmin } from "@/lib/auth";
 import { generatePin, encryptPin } from "@/lib/crypto-utils";
 import { errResponse, getEventoId, okResponse } from "@/lib/utils-server";
@@ -19,17 +19,19 @@ export async function GET(request: Request) {
   const eventoId = getEventoId(request);
   if (!eventoId) return errResponse("Evento requerido", 400);
   const entes = await getEntes(eventoId);
-  // Nunca devolver pin_hash
-  return okResponse(
-    entes.map((e) => ({
+  const withCounts = await Promise.all(
+    entes.map(async (e) => ({
       id: e.id,
       nombre: e.nombre,
       cupo_maximo: e.cupo_maximo,
+      cupos_usados: await countInvitadosPorEnte(e.id),
       evento_id: e.evento_id,
       creado_en: e.creado_en,
       actualizado_en: e.actualizado_en,
     }))
   );
+  // Nunca devolver pin_hash
+  return okResponse(withCounts);
 }
 
 export async function POST(request: Request) {
