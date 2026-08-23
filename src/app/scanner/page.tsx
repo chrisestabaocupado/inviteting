@@ -174,6 +174,7 @@ export default function ScannerPage() {
 
         const config = {
           fps: 10,
+          aspectRatio: 1.0,
           qrbox: (width: number, height: number) => {
             const size = Math.floor(Math.min(width, height) * 0.68);
             return { width: size, height: size };
