@@ -1,7 +1,7 @@
 import bcryptjs from "bcryptjs";
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db/index";
-import { invitado as invitadoTable } from "@/db/schema";
+import { ente, invitado as invitadoTable } from "@/db/schema";
 import { getEnteById, getEvento } from "@/db/queries";
 import {
   checkRateLimit,
@@ -10,6 +10,7 @@ import {
   recordSuccess,
 } from "@/lib/rate-limit";
 import { solicitudRegistroSchema } from "@/lib/registro";
+import { generateQrToken } from "@/lib/crypto-utils";
 import { errResponse, okResponse } from "@/lib/utils-server";
 
 export async function POST(request: Request) {
@@ -18,11 +19,6 @@ export async function POST(request: Request) {
 
   if (!parsed.success) {
     return errResponse("Datos inválidos", 400);
-  }
-
-  const emails = parsed.data.personas.map((persona) => persona.email);
-  if (new Set(emails).size !== emails.length) {
-    return errResponse("Hay correos repetidos en la solicitud", 409);
   }
 
   const evento = await getEvento(parsed.data.evento_id);
@@ -53,56 +49,79 @@ export async function POST(request: Request) {
   await recordSuccess(huella);
 
   try {
-    const result = await db.transaction(async (txDb) => {
+    const invitado = await db.transaction(async (txDb) => {
+      const enteRows = await txDb
+        .select()
+        .from(ente)
+        .where(eq(ente.id, enteRow.id))
+        .for("update");
+      if (!enteRows.length) {
+        throw new Error("Ente no encontrado");
+      }
+      const usedRows = await txDb
+        .select({ count: count() })
+        .from(invitadoTable)
+        .where(
+          and(
+            eq(invitadoTable.ente_id, enteRow.id),
+            eq(invitadoTable.estado_solicitud, "aprobada")
+          )
+        );
+      if (usedRows[0].count >= enteRows[0].cupo_maximo) {
+        throw new Error("Cupo agotado para este ente");
+      }
+
       const duplicateRows = await txDb
-        .select({ email: invitadoTable.email })
+        .select({ id: invitadoTable.id })
         .from(invitadoTable)
         .where(
           and(
             eq(invitadoTable.evento_id, evento.id),
-            sql`lower(${invitadoTable.email}) in (${sql.join(
-              emails.map((email) => sql`${email}`),
-              sql`, `
-            )})`,
+            sql`lower(${invitadoTable.email}) = ${parsed.data.email}`,
             inArray(invitadoTable.estado_solicitud, ["pendiente", "aprobada"])
           )
         )
         .limit(1);
 
       if (duplicateRows.length) {
-        throw new Error("Uno de los correos ya está registrado");
+        throw new Error("El email ya está registrado");
       }
 
-      return txDb
+      const rows = await txDb
         .insert(invitadoTable)
-        .values(
-          parsed.data.personas.map((persona) => ({
-            evento_id: evento.id,
-            ente_id: enteRow.id,
-            nombre: persona.nombre,
-            cargo: persona.cargo,
-            email: persona.email,
-            telefono: persona.telefono,
-            confirmacion: parsed.data.confirmacion,
-            origen: "publico" as const,
-            estado_solicitud: "pendiente" as const,
-            estado_invitacion: "no_enviada" as const,
-          }))
-        )
+        .values({
+          evento_id: evento.id,
+          ente_id: enteRow.id,
+          nombre: parsed.data.nombre,
+          cargo: parsed.data.cargo,
+          email: parsed.data.email,
+          telefono: parsed.data.telefono,
+          confirmacion: parsed.data.confirmacion,
+          origen: "publico",
+          estado_solicitud: "aprobada",
+          estado_invitacion: "no_enviada",
+          token_qr: generateQrToken(),
+          aprobado_en: new Date(),
+        })
         .returning();
+      return rows[0];
     });
 
-    return okResponse(result);
+    return okResponse(invitado);
   } catch (error) {
     const message = error instanceof Error ? error.message : "";
     const databaseError = error as { code?: string; constraint?: string };
+
+    if (message.includes("Cupo agotado")) {
+      return errResponse("Cupo agotado para este ente", 409);
+    }
 
     if (
       message.includes("registrado") ||
       (databaseError.code === "23505" &&
         databaseError.constraint === "invitado_email_unico")
     ) {
-      return errResponse("Uno de los correos ya está registrado", 409);
+      return errResponse("El email ya está registrado", 409);
     }
 
     throw error;

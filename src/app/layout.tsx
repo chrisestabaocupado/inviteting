@@ -17,7 +17,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="es" className={`${plusJakarta.variable} h-full antialiased`}>
-      <body className="flex min-h-dvh w-full flex-col bg-[#f5f5f6] font-sans text-[#18181b]">
+      <body className="flex min-h-dvh w-full flex-col bg-background font-sans text-foreground">
         {children}
         <Toaster />
       </body>

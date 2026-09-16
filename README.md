@@ -4,10 +4,10 @@ Sistema de gestión de invitaciones para eventos protocolares. Construido con Ne
 
 ## Características
 
-- **Registro público múltiple**: cada ente puede enviar hasta 5 funcionarios por solicitud usando un PIN de ente (6 dígitos), con nombre completo y datos de contacto propios por funcionario.
+- **Registro público**: una persona por solicitud usando un PIN de ente (6 dígitos), con nombre completo y datos de contacto. Cada registro se aprueba al instante.
 - **Panel administrativo**: protegido con PIN general; gestiona evento, entes, solicitudes e invitados.
 - **Múltiples eventos**: selector de workspace con entes e invitados aislados por evento.
-- **Código QR por invitado**: generado al aprobar; escaneable en entrada.
+- **Código QR por invitado**: generado al registrar; escaneable en entrada.
 - **PDF de invitación**: generado en el navegador con `@react-pdf/renderer` + QR embebido.
 - **Scanner**: validación de QR con `html5-qrcode`.
 
@@ -42,7 +42,7 @@ pnpm exec drizzle-kit migrate
 
 Cada evento expone enlaces propios de registro y escáner con `?evento=<id>` desde la pestaña **Evento**.
 
-El registro múltiple es atómico: si alguno de los correos ya está registrado, no se crea ninguna persona del envío. El cupo del ente se consume al **aprobar** la solicitud (una solicitud pendiente no ocupa cupo).
+El registro es atómico: se aprueba al instante, genera el token QR y consume cupo del ente. Si el correo ya está registrado o el cupo está lleno, no se crea el registro.
 
 ## Scripts
 

@@ -90,107 +90,82 @@ async function postRegistration(payload: unknown) {
   );
 }
 
-function batchPayload(eventoId: string, enteId: string) {
+function registroPayload(
+  eventoId: string,
+  enteId: string,
+  email = `invitado-${Date.now()}-${Math.random()}@example.com`
+) {
   return {
     evento_id: eventoId,
     ente_id: enteId,
     pin: "123456",
+    nombre: "Ana Pérez",
+    cargo: "Directora",
+    email,
+    telefono: "04120000001",
     confirmacion: true,
-    personas: [
-      {
-        nombre: "Ana Pérez",
-        cargo: "Directora",
-        email: `ana-${Date.now()}@example.com`,
-        telefono: "04120000001",
-      },
-      {
-        nombre: "Luis Gómez",
-        cargo: "Coordinador",
-        email: `luis-${Date.now()}@example.com`,
-        telefono: "04120000002",
-      },
-    ],
   };
 }
 
-describe("Registro público en lote", () => {
-  it("inserta todas las personas del lote", async () => {
+describe("Registro público aprobado al instante", () => {
+  it("registra una persona aprobada con token QR y consume cupo", async () => {
     const { evento, ente } = await createRegistrationContext();
-    const payload = batchPayload(evento.id, ente.id);
-    const response = await postRegistration(payload);
+    const response = await postRegistration(
+      registroPayload(evento.id, ente.id)
+    );
     const body = (await response.json()) as {
       ok: boolean;
-      data: Array<{ nombre: string }>;
+      data: {
+        nombre: string;
+        estado_solicitud: string;
+        token_qr: string | null;
+      };
     };
 
     expect(response.status).toBe(200);
     expect(body.ok).toBe(true);
-    expect(body.data.map((item) => item.nombre)).toEqual([
-      "Ana Pérez",
-      "Luis Gómez",
-    ]);
-    expect(await getInvitadosByEvento(evento.id)).toHaveLength(2);
-  });
-
-  it("rechaza correos repetidos dentro del lote sin insertar filas", async () => {
-    const { evento, ente } = await createRegistrationContext();
-    const payload = batchPayload(evento.id, ente.id);
-    payload.personas[1].email = payload.personas[0].email.toUpperCase();
-
-    const response = await postRegistration(payload);
-
-    expect(response.status).toBe(409);
-    expect(await getInvitadosByEvento(evento.id)).toHaveLength(0);
-  });
-
-  it("revierte todo el lote si un correo ya está registrado", async () => {
-    const { evento, ente } = await createRegistrationContext();
-    const payload = batchPayload(evento.id, ente.id);
-    await insertInvitado({
-      evento_id: evento.id,
-      ente_id: ente.id,
-      nombre: "Ana Pérez",
-      cargo: "Directora",
-      email: payload.personas[0].email.toUpperCase(),
-      telefono: "04120000001",
-      confirmacion: true,
-      origen: "publico",
-      estado_solicitud: "pendiente",
-    });
-
-    const response = await postRegistration(payload);
-
-    expect(response.status).toBe(409);
+    expect(body.data.nombre).toBe("Ana Pérez");
+    expect(body.data.estado_solicitud).toBe("aprobada");
+    expect(body.data.token_qr).toBeTruthy();
     expect(await getInvitadosByEvento(evento.id)).toHaveLength(1);
+    expect(await countInvitadosPorEnte(ente.id)).toBe(1);
   });
 
-  it("el registro pendiente no consume cupo", async () => {
+  it("rechaza un correo ya registrado sin insertar filas", async () => {
+    const { evento, ente } = await createRegistrationContext();
+    const email = `duplicado-${Date.now()}@example.com`;
+
+    const first = await postRegistration(
+      registroPayload(evento.id, ente.id, email)
+    );
+    expect(first.status).toBe(200);
+
+    const second = await postRegistration(
+      registroPayload(evento.id, ente.id, email.toUpperCase())
+    );
+
+    expect(second.status).toBe(409);
+    expect(await getInvitadosByEvento(evento.id)).toHaveLength(1);
+    expect(await countInvitadosPorEnte(ente.id)).toBe(1);
+  });
+
+  it("rechaza el registro cuando el cupo está agotado", async () => {
     const { evento, ente } = await createRegistrationContext(1);
-    const response = await postRegistration(batchPayload(evento.id, ente.id));
 
-    expect(response.status).toBe(200);
-    expect(await getInvitadosByEvento(evento.id)).toHaveLength(2);
-    expect(await countInvitadosPorEnte(ente.id)).toBe(0);
-  });
+    const first = await postRegistration(
+      registroPayload(evento.id, ente.id)
+    );
+    expect(first.status).toBe(200);
 
-  it("varios lotes pendientes no se bloquean por cupo", async () => {
-    const { evento, ente } = await createRegistrationContext(3);
-    const first = batchPayload(evento.id, ente.id);
-    const second = batchPayload(evento.id, ente.id);
-    second.personas[0].email = `otra-ana-${Date.now()}@example.com`;
-    second.personas[1].email = `otro-luis-${Date.now()}@example.com`;
+    const second = await postRegistration(
+      registroPayload(evento.id, ente.id)
+    );
+    const body = (await second.json()) as { error: string };
 
-    const responses = await Promise.all([
-      postRegistration(first),
-      postRegistration(second),
-    ]);
-
-    expect(responses.map((response) => response.status).sort()).toEqual([
-      200,
-      200,
-    ]);
-    expect(await getInvitadosByEvento(evento.id)).toHaveLength(4);
-    expect(await countInvitadosPorEnte(ente.id)).toBe(0);
+    expect(second.status).toBe(409);
+    expect(body.error).toContain("Cupo agotado");
+    expect(await getInvitadosByEvento(evento.id)).toHaveLength(1);
+    expect(await countInvitadosPorEnte(ente.id)).toBe(1);
   });
 });
 

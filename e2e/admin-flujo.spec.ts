@@ -9,7 +9,7 @@ test.setTimeout(90_000);
 
 const pin = process.env.GENERAL_ACCESS_PIN ?? "1234";
 
-test("flujo completo: login → evento → ente → registro → aprobar → QR", async ({ page }) => {
+test("flujo completo: login → evento → ente → registro → QR", async ({ page }) => {
   const ts = Date.now();
 
   // ===== 1. Login admin =====
@@ -54,9 +54,8 @@ test("flujo completo: login → evento → ente → registro → aprobar → QR"
   const entePin = pinMatch ? pinMatch[1] : "";
   const enteNombre = `Ente E2E ${ts}`;
 
-  // ===== 4. Registrar dos invitados =====
-  const firstEmail = `e2e-1-${ts}@example.com`;
-  const secondEmail = `e2e-2-${ts}@example.com`;
+  // ===== 4. Registrar un invitado =====
+  const email = `e2e-${ts}@example.com`;
   await page.goto(`/registro?evento=${eventoId}`);
   await page.waitForSelector("text=Registro de invitados");
   await page.getByRole("combobox").click();
@@ -65,28 +64,18 @@ test("flujo completo: login → evento → ente → registro → aprobar → QR"
   await page.fill('[placeholder="••••••"]', entePin);
   await page.getByPlaceholder("Nombre y apellido").fill("Nombre Apellido E2E");
   await page.fill('[placeholder="Ej. Directora de Protocolo"]', "CargoE2E");
-  await page.fill('[placeholder="nombre@correo.com"]', firstEmail);
+  await page.fill('[placeholder="nombre@correo.com"]', email);
   await page.fill('[placeholder="+58 412 000 0000"]', "+58000000001");
-  await page.getByRole("button", { name: "Agregar persona" }).click();
-  await page.getByPlaceholder("Nombre y apellido").nth(1).fill("Segunda Persona E2E");
-  await page.getByPlaceholder("Ej. Directora de Protocolo").nth(1).fill("Segundo Cargo E2E");
-  await page.getByPlaceholder("nombre@correo.com").nth(1).fill(secondEmail);
-  await page.getByPlaceholder("+58 412 000 0000").nth(1).fill("+58000000002");
   await page.getByRole("checkbox").click();
-  await page.getByRole("button", { name: "Enviar 2 solicitudes" }).click();
-  await expect(page.getByText("2 solicitudes enviadas")).toBeVisible();
+  await page.getByRole("button", { name: "Enviar solicitud" }).click();
 
-  // ===== 5. Aprobar en admin =====
+  // ===== 5. QR inmediato y descarga PDF =====
+  await expect(page.getByText("Registro exitoso")).toBeVisible();
+  await expect(page.getByAltText("Código QR de Nombre Apellido E2E")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Descargar PDF" })).toBeVisible();
+
+  // ===== 6. Verificar aprobación en admin =====
   await page.goto(`/admin?evento=${eventoId}`);
-  await expect(page.getByRole("heading", { name: "Solicitudes" })).toBeVisible();
-  await expect(page.locator(`text=${firstEmail}`)).toBeVisible();
-  await expect(page.locator(`text=${secondEmail}`)).toBeVisible();
-
-  const card = page.locator(`text=${firstEmail}`).locator("xpath=../../..");
-  await card.locator('button:has-text("Aprobar")').click();
-  await expect(page.locator("text=Solicitud aprobada")).toBeVisible();
-
-  // ===== 6. Verificar QR en Invitados =====
   await page.click('button:has-text("Invitados")');
   await expect(page.locator("text=Nombre Apellido E2E")).toBeVisible();
   await expect(page.locator('button:has-text("Descargar")').first()).toBeVisible();

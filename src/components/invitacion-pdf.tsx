@@ -19,10 +19,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 24,
   },
+  logo: {
+    width: 56,
+    height: 56,
+    alignSelf: "center",
+    marginBottom: 12,
+  },
   eventName: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#4338ca",
+    color: "#c8102e",
     marginBottom: 8,
   },
   eventMeta: {
@@ -60,7 +66,7 @@ const styles = StyleSheet.create({
   },
   qrLabel: {
     fontSize: 11,
-    color: "#4338ca",
+    color: "#c8102e",
     fontWeight: "bold",
   },
   footer: {
@@ -95,10 +101,18 @@ export function InvitacionPdfDocument({
   enteNombre,
   qrDataUrl,
 }: InvitacionPdfProps) {
+  const logoUrl =
+    typeof window !== "undefined"
+      ? new URL("/logo_intitucional.jpeg", window.location.origin).href
+      : "/logo_intitucional.jpeg";
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
+          {/* react-pdf's Image is not an HTML image and does not support alt. */}
+          {/* eslint-disable-next-line jsx-a11y/alt-text */}
+          <Image style={styles.logo} src={logoUrl} />
           <Text style={styles.eventName}>{evento.nombre}</Text>
           <Text style={styles.eventMeta}>
             {evento.fecha} · {evento.hora}

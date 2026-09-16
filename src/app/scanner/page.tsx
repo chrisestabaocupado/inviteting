@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from "html5-qrcode";
 import { ScanLine, LogOut, Check, Clock, X, Image as ImageIcon, Loader2, Camera } from "lucide-react";
 import { toast } from "sonner";
@@ -276,7 +277,13 @@ export default function ScannerPage() {
         <div className="flex items-center justify-between px-5 py-[18px_12px]">
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-lg font-extrabold">
-              <ScanLine size={20} />
+              <Image
+                src="/logo_intitucional.jpeg"
+                alt="Unidad Nacional de Inteligencia Financiera"
+                width={28}
+                height={28}
+                className="h-7 w-7 rounded-full object-cover"
+              />
               Escáner de entrada
             </div>
             <select

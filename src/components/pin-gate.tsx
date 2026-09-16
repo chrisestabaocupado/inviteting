@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Ticket, KeyRound, Loader2 } from "lucide-react";
+import Image from "next/image";
+import { KeyRound, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -44,9 +45,14 @@ export function PinGate({ onAuth }: PinGateProps) {
   return (
     <div className="flex min-h-dvh w-full flex-col items-center justify-center px-5 py-8">
       <div className="w-full max-w-[360px] text-center">
-        <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-[15px] bg-[#4338ca] text-white shadow-[0_8px_20px_rgba(67,56,202,0.28)]">
-          <Ticket size={26} />
-        </div>
+        <Image
+          src="/logo_intitucional.jpeg"
+          alt="Unidad Nacional de Inteligencia Financiera"
+          width={56}
+          height={56}
+          loading="eager"
+          className="mx-auto mb-5 h-14 w-14 rounded-full object-cover shadow-[0_8px_20px_rgba(200,16,46,0.28)]"
+        />
         <h1 className="text-[23px] font-extrabold tracking-tight">Acceso administrativo</h1>
         <p className="mt-2 text-sm text-[#71717a]">Ingresa tu PIN para continuar</p>
       </div>
@@ -62,7 +68,7 @@ export function PinGate({ onAuth }: PinGateProps) {
             placeholder="••••••"
             value={pin}
             onChange={(e) => setPin(e.target.value)}
-            className="h-12 rounded-[10px] border-[#e5e5e8] bg-white pl-10 text-base shadow-none focus:border-[#a5b4fc] focus:ring-[3px] focus:ring-[rgba(99,102,241,0.15)] md:text-[15px]"
+            className="h-12 rounded-[10px] border-[#e5e5e8] bg-white pl-10 text-base shadow-none focus:border-[#e9a3af] focus:ring-[3px] focus:ring-[rgba(200,16,46,0.15)] md:text-[15px]"
           />
         </div>
         {error && (
@@ -71,7 +77,7 @@ export function PinGate({ onAuth }: PinGateProps) {
         <Button
           type="submit"
           disabled={loading}
-          className="mt-4 h-[52px] w-full rounded-[12px] bg-[#4338ca] text-[15.5px] font-bold text-white hover:bg-[#3730a3] active:scale-[0.99]"
+          className="mt-4 h-[52px] w-full rounded-[12px] bg-[#c8102e] text-[15.5px] font-bold text-white hover:bg-[#9e0c24] active:scale-[0.99]"
         >
           {loading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
           Entrar

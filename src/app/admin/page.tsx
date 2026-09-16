@@ -1,8 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
-  Ticket,
   CalendarDays,
   Building2,
   Inbox,
@@ -561,7 +561,7 @@ export default function AdminPage() {
   if (checking) {
     return (
       <div className="flex min-h-dvh items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-[#4338ca]" />
+        <Loader2 className="h-6 w-6 animate-spin text-[#c8102e]" />
       </div>
     );
   }
@@ -576,9 +576,14 @@ export default function AdminPage() {
       <div className="sticky top-0 z-30 border-b border-[#e5e5e8] bg-white px-4 py-[12px_10px]">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-[10px]">
-            <div className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-[#4338ca] text-white">
-              <Ticket size={20} />
-            </div>
+            <Image
+              src="/logo_intitucional.jpeg"
+              alt="Unidad Nacional de Inteligencia Financiera"
+              width={36}
+              height={36}
+              loading="eager"
+              className="h-9 w-9 shrink-0 rounded-full object-cover"
+            />
             <div className="min-w-0 flex-1">
               <div className="text-base font-bold tracking-tight">inviteting</div>
               <Select
@@ -590,9 +595,9 @@ export default function AdminPage() {
               >
                 <SelectTrigger
                   aria-label="Evento activo"
-                  className="h-8 w-full rounded-[9px] border-[#e5e5e8] bg-[#fafafa] px-2.5 py-0 text-xs font-semibold text-[#3f3f46] shadow-none hover:border-[#c7d2fe] hover:bg-[#eef2ff] focus-visible:border-[#818cf8] focus-visible:ring-[3px] focus-visible:ring-[rgba(99,102,241,0.15)]"
+                  className="h-8 w-full rounded-[9px] border-[#e5e5e8] bg-[#fafafa] px-2.5 py-0 text-xs font-semibold text-[#3f3f46] shadow-none hover:border-[#f3c9d0] hover:bg-[#fcedef] focus-visible:border-[#e9a3af] focus-visible:ring-[3px] focus-visible:ring-[rgba(200,16,46,0.15)]"
                 >
-                  <CalendarDays className="text-[#6366f1]" />
+                  <CalendarDays className="text-[#c8102e]" />
                   <SelectValue className="min-w-0 truncate">
                     {evento?.nombre || "Selecciona un evento"}
                   </SelectValue>
@@ -606,10 +611,10 @@ export default function AdminPage() {
                     <SelectItem
                       key={item.id}
                       value={item.id}
-                      className="min-h-14 rounded-[9px] px-2.5 py-2 focus:bg-[#eef2ff]"
+                      className="min-h-14 rounded-[9px] px-2.5 py-2 focus:bg-[#fcedef]"
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
-                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-[#eef2ff] text-[#4f46e5]">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[9px] bg-[#fcedef] text-[#a50d26]">
                           <CalendarDays size={17} />
                         </span>
                         <span className="min-w-0">
@@ -626,10 +631,10 @@ export default function AdminPage() {
                   {eventos.length > 0 && <SelectSeparator className="my-1.5" />}
                   <SelectItem
                     value="new"
-                    className="min-h-12 rounded-[9px] px-2.5 py-2 font-semibold text-[#4f46e5] focus:bg-[#eef2ff] focus:text-[#4338ca]"
+                    className="min-h-12 rounded-[9px] px-2.5 py-2 font-semibold text-[#a50d26] focus:bg-[#fcedef] focus:text-[#c8102e]"
                   >
                     <span className="flex items-center gap-2.5">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#eef2ff]">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#fcedef]">
                         <Plus size={17} />
                       </span>
                       Crear nuevo evento
@@ -741,7 +746,7 @@ export default function AdminPage() {
               <Button
                 onClick={saveEvento}
                 disabled={savingEvento}
-                className="h-12 w-full rounded-[11px] bg-[#4338ca] text-[15px] font-semibold text-white hover:bg-[#3730a3]"
+                className="h-12 w-full rounded-[11px] bg-[#c8102e] text-[15px] font-semibold text-white hover:bg-[#9e0c24]"
               >
                 {savingEvento ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save size={18} />}
                 Guardar cambios
@@ -864,7 +869,7 @@ export default function AdminPage() {
           <button
             aria-label="Nuevo ente"
             onClick={() => setDialogOpen(true)}
-            className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#4338ca] text-white shadow-[0_6px_18px_rgba(67,56,202,0.35)] active:scale-95 xl:right-[calc((100vw-56rem)/2+1rem)]"
+            className="fixed right-4 bottom-[calc(5rem+env(safe-area-inset-bottom))] z-40 flex h-14 w-14 items-center justify-center rounded-full bg-[#c8102e] text-white shadow-[0_6px_18px_rgba(200,16,46,0.32)] active:scale-95 xl:right-[calc((100vw-56rem)/2+1rem)]"
           >
             <Plus size={26} />
           </button>
@@ -899,7 +904,7 @@ export default function AdminPage() {
               <Button
                 onClick={createEnte}
                 disabled={creatingEnte || !newEnteName.trim()}
-                className="h-12 w-full rounded-[11px] bg-[#4338ca] text-[15px] font-semibold text-white hover:bg-[#3730a3]"
+                className="h-12 w-full rounded-[11px] bg-[#c8102e] text-[15px] font-semibold text-white hover:bg-[#9e0c24]"
               >
                 {creatingEnte ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
                 Crear ente
@@ -951,7 +956,7 @@ export default function AdminPage() {
             onClick={() => setTab(t.key)}
             disabled={!evento?.id && t.key !== "evento"}
             className={`flex min-h-11 flex-1 flex-col items-center justify-center gap-[3px] text-[10.5px] font-semibold ${
-              tab === t.key ? "text-[#4338ca]" : "text-[#71717a]"
+              tab === t.key ? "text-[#c8102e]" : "text-[#71717a]"
             } disabled:opacity-40`}
           >
             {t.icon}
@@ -1007,7 +1012,7 @@ function EnteCard({
       </div>
       <div className="mt-3 h-[6px] overflow-hidden rounded-full bg-[#f4f4f5]">
         <div
-          className="h-full rounded-full bg-[#4338ca]"
+          className="h-full rounded-full bg-[#c8102e]"
           style={{ width: `${pct}%` }}
         />
       </div>
@@ -1077,7 +1082,7 @@ function SolicitudCard({
   return (
     <div className="mb-3 rounded-[14px] border border-[#e5e5e8] bg-white p-[14px]">
       <div className="flex items-start gap-3">
-        <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] bg-[#eef2ff] text-[15px] font-bold text-[#4338ca]">
+        <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] bg-[#fcedef] text-[15px] font-bold text-[#c8102e]">
           {initials(s.nombre)}
         </div>
         <div className="min-w-0 flex-1">
@@ -1171,7 +1176,7 @@ function InvitadoCard({
   return (
     <div className="mb-3 rounded-[14px] border border-[#e5e5e8] bg-white p-[14px]">
       <div className="flex items-start gap-3">
-        <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] bg-[#eef2ff] text-[15px] font-bold text-[#4338ca]">
+        <div className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[12px] bg-[#fcedef] text-[15px] font-bold text-[#c8102e]">
           {initials(s.nombre)}
         </div>
         <div className="min-w-0 flex-1">
